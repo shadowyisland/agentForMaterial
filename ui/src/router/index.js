@@ -29,66 +29,116 @@ import Layout from '@/layout'
  */
 
 // 公共路由
+// export const constantRoutes = [
+//   {
+//     path: '/redirect',
+//     component: Layout,
+//     hidden: true,
+//     children: [
+//       {
+//         path: '/redirect/:path(.*)',
+//         component: () => import('@/views/redirect')
+//       }
+//     ]
+//   },
+//   {
+//     path: '/login',
+//     component: () => import('@/views/login'),
+//     hidden: true
+//   },
+//   {
+//     path: '/register',
+//     component: () => import('@/views/register'),
+//     hidden: true
+//   },
+//   {
+//     path: '/404',
+//     component: () => import('@/views/error/404'),
+//     hidden: true
+//   },
+//   {
+//     path: '/401',
+//     component: () => import('@/views/error/401'),
+//     hidden: true
+//   },
+//   {
+//     path: '',
+//     component: Layout,
+//     redirect: 'index',
+//     children: [
+//       {
+//         path: 'index',
+//         component: () => import('@/views/index'),
+//         name: 'Index',
+//         meta: { title: '首页', icon: 'dashboard', affix: true }
+//       }
+//     ]
+//   },
+//   {
+//     path: '/user',
+//     component: Layout,
+//     hidden: true,
+//     redirect: 'noredirect',
+//     children: [
+//       {
+//         path: 'profile',
+//         component: () => import('@/views/system/user/profile/index'),
+//         name: 'Profile',
+//         meta: { title: '个人中心', icon: 'user' }
+//       }
+//     ]
+//   }
+// ]
+
+  // 公共路由
 export const constantRoutes = [
-  {
-    path: '/redirect',
-    component: Layout,
-    hidden: true,
-    children: [
-      {
-        path: '/redirect/:path(.*)',
-        component: () => import('@/views/redirect')
-      }
-    ]
-  },
-  {
-    path: '/login',
-    component: () => import('@/views/login'),
-    hidden: true
-  },
-  {
-    path: '/register',
-    component: () => import('@/views/register'),
-    hidden: true
-  },
-  {
-    path: '/404',
-    component: () => import('@/views/error/404'),
-    hidden: true
-  },
-  {
-    path: '/401',
-    component: () => import('@/views/error/401'),
-    hidden: true
-  },
-  {
-    path: '',
-    component: Layout,
-    redirect: 'index',
-    children: [
-      {
-        path: 'index',
-        component: () => import('@/views/index'),
-        name: 'Index',
-        meta: { title: '首页', icon: 'dashboard', affix: true }
-      }
-    ]
-  },
-  {
-    path: '/user',
-    component: Layout,
-    hidden: true,
-    redirect: 'noredirect',
-    children: [
-      {
-        path: 'profile',
-        component: () => import('@/views/system/user/profile/index'),
-        name: 'Profile',
-        meta: { title: '个人中心', icon: 'user' }
-      }
-    ]
-  }
-]
+    {
+      path: '/redirect',
+      component: Layout,
+      hidden: true,
+      children: [
+        {
+          path: '/redirect/:path(.*)',
+          component: () => import('@/views/redirect')
+        }
+      ]
+    },
+    {
+      path: '/login',
+      component: () => import('@/views/login'),
+      hidden: true // 隐藏登录页
+    },
+    {
+      path: '',
+      component: Layout,
+      redirect: '/system/user', // 默认直接跳转到用户管理
+      hidden: true, // 隐藏原本的首页 Dashboard
+      children: [
+        {
+          path: 'index',
+          component: () => import('@/views/index'),
+          name: 'Index',
+          meta: { title: '首页', icon: 'dashboard', affix: true }
+        }
+      ]
+    },
+    // --- 重点：手动添加“用户管理”界面 ---
+    {
+      path: '/system',
+      component: Layout,
+      redirect: 'noRedirect',
+      alwaysShow: true, // 总是显示这个菜单
+      meta: { title: '系统管理', icon: 'system' },
+      children: [
+        {
+          path: 'user',
+          component: () => import('@/views/system/user/index'), // 指向用户管理组件
+          name: 'User',
+          meta: { title: '用户管理', icon: 'peoples' }
+        }
+      ]
+    }
+  ]
 
 // 动态路由，基于用户权限动态去加载
 export const dynamicRoutes = [
