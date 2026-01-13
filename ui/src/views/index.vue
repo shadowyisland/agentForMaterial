@@ -4,13 +4,13 @@
       <el-col :sm="24" :lg="12" style="padding-left: 20px">
         <h2>材料后台管理框架</h2>
         <p></p>
-        <p>
+        <p v-if="false">
           <b>当前版本:</b> <span>v{{ version }}</span>
         </p>
-        <p>
+        <p v-if="false">
           <el-tag type="danger">&yen;</el-tag>
         </p>
-        <p>
+        <p v-if="false"> 
           <el-button
             type="primary"
             size="mini"
@@ -29,7 +29,7 @@
         </p>
       </el-col>
 
-      <el-col :sm="24" :lg="12" style="padding-left: 50px">
+      <el-col :sm="24" :lg="12" style="padding-left: 50px" v-if="false">
         <el-row>
           <el-col :span="12">
             <h2>技术选型</h2>
@@ -63,8 +63,8 @@
         </el-row>
       </el-col>
     </el-row>
-    <el-divider />
-    <el-row :gutter="20">
+    <el-divider v-if="false" />
+    <el-row :gutter="20" v-if="false">
       <el-col :xs="24" :sm="24" :md="12" :lg="8">
         <el-card class="update-log">
           <div slot="header" class="clearfix">

@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.system.mapper.SysDocumentMapper">
+
+    <resultMap type="SysDocument" id="SysDocumentResult">
+        <result property="documentId"    column="document_id"    />
+        <result property="documentName"  column="document_name"  />
+        <result property="filePath"      column="file_path"      />
+        <result property="fileOriginName" column="file_origin_name" />
+        <result property="fileSuffix"    column="file_suffix"    />
+        <result property="createBy"      column="create_by"      />
+        <result property="createTime"    column="create_time"    />
+        <result property="remark"        column="remark"         />
+    </resultMap>
+
+    <sql id="selectDocumentVo">
+        select document_id, document_name, file_path, file_origin_name, file_suffix, create_by, create_time, remark from sys_document
+    </sql>
+
+    <select id="selectDocumentList" parameterType="SysDocument" resultMap="SysDocumentResult">
+        <include refid="selectDocumentVo"/>
+        <where>
+            <if test="documentName != null  and documentName != ''"> and document_name like concat('%', #{documentName}, '%')</if>
+        </where>
+        order by create_time desc
+    </select>
+
+    <select id="selectDocumentById" parameterType="Long" resultMap="SysDocumentResult">
+        <include refid="selectDocumentVo"/>
+        where document_id = #{documentId}
+    </select>
+
+    <insert id="insertDocument" parameterType="SysDocument" useGeneratedKeys="true" keyProperty="documentId">
+        insert into sys_document
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="documentName != null">document_name,</if>
+            <if test="filePath != null">file_path,</if>
+            <if test="fileOriginName != null">file_origin_name,</if>
+            <if test="fileSuffix != null">file_suffix,</if>
+            <if test="createBy != null">create_by,</if>
+            <if test="createTime != null">create_time,</if>
+            <if test="remark != null">remark,</if>
+        </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="documentName != null">#{documentName},</if>
+            <if test="filePath != null">#{filePath},</if>
+            <if test="fileOriginName != null">#{fileOriginName},</if>
+            <if test="fileSuffix != null">#{fileSuffix},</if>
+            <if test="createBy != null">#{createBy},</if>
+            <if test="createTime != null">#{createTime},</if>
+            <if test="remark != null">#{remark},</if>
+        </trim>
+    </insert>
+
+    <delete id="deleteDocumentByIds" parameterType="String">
+        delete from sys_document where document_id in
+        <foreach item="documentId" collection="array" open="(" separator="," close=")">
+            #{documentId}
+        </foreach>
+    </delete>
+</mapper>

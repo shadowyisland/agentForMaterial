@@ -132,6 +132,19 @@ export default {
           this.$store.dispatch('tagsView/addVisitedView', tag)
         }
       }
+
+      // 2. 新增逻辑：系统启动时自动打开“用户管理”和“文档管理”
+      // 注意：这里的路径必须和菜单管理中配置的路由地址一致
+      const autoOpenPaths = ['/system/user', '/system/document']
+
+      autoOpenPaths.forEach(path => {
+        // 解析路由对象
+        const route = this.$router.resolve(path).route
+        // 如果路由存在且有效，则添加到标签页栏
+        if (route && route.name) {
+          this.$store.dispatch('tagsView/addVisitedView', route)
+        }
+      })
     },
     addTags() {
       const { name } = this.$route

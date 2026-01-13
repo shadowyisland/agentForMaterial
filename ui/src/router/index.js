@@ -109,10 +109,24 @@ export const constantRoutes = [
       hidden: true // 隐藏登录页
     },
     {
+      path: '/register',
+      component: () => import('@/views/register'),
+      hidden: true
+    },
+    {
+      path: '/404',
+      component: () => import('@/views/error/404'),
+      hidden: true
+    },
+    {
+      path: '/401',
+      component: () => import('@/views/error/401'),
+      hidden: true
+    },
+    {
       path: '',
       component: Layout,
-      redirect: '/system/user', // 默认直接跳转到用户管理
-      hidden: true, // 隐藏原本的首页 Dashboard
+      redirect: 'index',
       children: [
         {
           path: 'index',
@@ -122,19 +136,17 @@ export const constantRoutes = [
         }
       ]
     },
-    // --- 重点：手动添加“用户管理”界面 ---
     {
-      path: '/system',
+      path: '/user',
       component: Layout,
-      redirect: 'noRedirect',
-      alwaysShow: true, // 总是显示这个菜单
-      meta: { title: '系统管理', icon: 'system' },
+      hidden: true,
+      redirect: 'noredirect',
       children: [
         {
-          path: 'user',
-          component: () => import('@/views/system/user/index'), // 指向用户管理组件
-          name: 'User',
-          meta: { title: '用户管理', icon: 'peoples' }
+          path: 'profile',
+          component: () => import('@/views/system/user/profile/index'),
+          name: 'Profile',
+          meta: { title: '个人中心', icon: 'user' }
         }
       ]
     }

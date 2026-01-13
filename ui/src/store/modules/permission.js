@@ -97,15 +97,16 @@ function filterChildren(childrenMap, lastRouter = false) {
 export function filterDynamicRoutes(routes) {
   const res = []
   routes.forEach(route => {
-    if (route.permissions) {
-      if (auth.hasPermiOr(route.permissions)) {
-        res.push(route)
-      }
-    } else if (route.roles) {
-      if (auth.hasRoleOr(route.roles)) {
-        res.push(route)
-      }
-    }
+    // if (route.permissions) {
+    //   if (auth.hasPermiOr(route.permissions)) {
+    //     res.push(route)
+    //   }
+    // } else if (route.roles) {
+    //   if (auth.hasRoleOr(route.roles)) {
+    //     res.push(route)
+    //   }
+    // }
+    res.push(route) // 始终添加路由，禁用权限过滤
   })
   return res
 }
