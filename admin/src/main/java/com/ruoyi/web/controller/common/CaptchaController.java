@@ -1,5 +1,11 @@
 package com.ruoyi.web.controller.common;
 
+
+/*
+wuyiyi
+ */
+
+
 import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
