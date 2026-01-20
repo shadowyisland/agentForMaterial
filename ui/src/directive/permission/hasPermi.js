@@ -5,35 +5,25 @@
 
 import store from '@/store'
 
-// export default {
-//   inserted(el, binding, vnode) {
-//     const { value } = binding
-//     const all_permission = "*:*:*"
-//     const permissions = store.getters && store.getters.permissions
-//
-//     if (value && value instanceof Array && value.length > 0) {
-//       const permissionFlag = value
-//
-//       const hasPermissions = permissions.some(permission => {
-//         return all_permission === permission || permissionFlag.includes(permission)
-//       })
-//
-//       if (!hasPermissions) {
-//         el.parentNode && el.parentNode.removeChild(el)
-//       }
-//     } else {
-//       throw new Error(`请设置操作权限标签值`)
-//     }
-//   }
-// }
+export default {
+  inserted(el, binding, vnode) {
+    const { value } = binding
+    const all_permission = "*:*:*"
+    const permissions = store.getters && store.getters.permissions
 
- /**
-  * 上帝模式权限指令
-  * 无论什么权限要求，统统放行显示
-  */
- export default {
-   inserted(el, binding, vnode) {
-     // 啥都不判断，直接结束，元素就会正常显示
-     return true
-   }
- }
+    if (value && value instanceof Array && value.length > 0) {
+      const permissionFlag = value
+
+      const hasPermissions = permissions.some(permission => {
+        return all_permission === permission || permissionFlag.includes(permission)
+      })
+
+      if (!hasPermissions) {
+        el.parentNode && el.parentNode.removeChild(el)
+      }
+    } else {
+      throw new Error(`请设置操作权限标签值`)
+    }
+  }
+}
+
