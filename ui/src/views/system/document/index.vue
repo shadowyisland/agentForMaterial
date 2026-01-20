@@ -125,6 +125,7 @@ import { getToken } from "@/utils/auth";
 
 export default {
   name: "Document",
+  //dicts: ['sys_normal_disable'],
   data() {
     return {
       // 遮罩层
@@ -162,7 +163,7 @@ export default {
           { required: true, message: "请上传文件", trigger: "blur" }
         ]
       },
-      // 上传参数
+      // 上传参数   oss上传改为：/common/upload/oss
       uploadUrl: process.env.VUE_APP_BASE_API + "/common/upload",
       headers: {
         Authorization: "Bearer " + getToken()
