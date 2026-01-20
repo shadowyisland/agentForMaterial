@@ -59,3 +59,11 @@ spring:
                 wall:
                     config:
                         multi-statement-allow: true
+
+aliyun:
+    oss:
+        file:
+            endpoint: oss-cn-shanghai.aliyuncs.com
+            keyid: YOUR_ACCESS_KEY_ID
+            keysecret: YOUR_ACCESS_KEY_SECRET
+            bucketname: kkmaterial1
