@@ -46,7 +46,23 @@
         <el-table v-loading="loading" :data="documentList" @selection-change="handleSelectionChange">
           <el-table-column type="selection" width="50" align="center" />
           <el-table-column label="文档ID" align="center" prop="documentId" />
-          <el-table-column label="文档名称" align="center" prop="documentName" :show-overflow-tooltip="true" />
+
+          <el-table-column label="文档名称" align="center" prop="documentName" :show-overflow-tooltip="true">
+            <template slot-scope="scope">
+              <span
+                class="link-type"
+                @click="handleDetail(scope.row)"
+              >{{ scope.row.documentName }}</span>
+            </template>
+          </el-table-column>
+
+          <el-table-column label="OCR状态" align="center" prop="isRecognized">
+            <template slot-scope="scope">
+              <el-tag v-if="scope.row.isRecognized === 1" type="success">已识别</el-tag>
+              <el-tag v-else type="info">未识别</el-tag>
+            </template>
+          </el-table-column>
+
           <el-table-column label="原始文件名" align="center" prop="fileOriginName" :show-overflow-tooltip="true" />
           <el-table-column label="上传人" align="center" prop="createBy" />
           <el-table-column label="上传时间" align="center" prop="createTime" width="180">
@@ -54,7 +70,6 @@
               <span>{{ parseTime(scope.row.createTime) }}</span>
             </template>
           </el-table-column>
-          <el-table-column label="备注" align="center" prop="remark" :show-overflow-tooltip="true" />
           <el-table-column label="操作" align="center" class-name="small-padding fixed-width">
             <template slot-scope="scope">
               <el-button
@@ -63,6 +78,15 @@
                 icon="el-icon-download"
                 @click="handleDownload(scope.row)"
               >下载</el-button>
+
+              <el-button
+                size="mini"
+                type="text"
+                icon="el-icon-aim"
+                @click="handleOcr(scope.row)"
+                v-hasPermi="['system:document:edit']"
+              >识别</el-button>
+
               <el-button
                 size="mini"
                 type="text"
@@ -93,7 +117,7 @@
           <el-upload
             ref="upload"
             :limit="1"
-            accept=".pdf"
+            accept=".pdf,.png,.jpg,.jpeg"
             :action="uploadUrl"
             :headers="headers"
             :on-success="handleUploadSuccess"
@@ -103,8 +127,8 @@
             drag
           >
             <i class="el-icon-upload"></i>
-            <div class="el-upload__text">将PDF文件拖到此处，或<em>点击上传</em></div>
-            <div class="el-upload__tip" slot="tip">只能上传pdf文件，且不超过50MB</div>
+            <div class="el-upload__text">将文件拖到此处，或<em>点击上传</em></div>
+            <div class="el-upload__tip" slot="tip">支持 PDF/JPG/PNG，且不超过50MB</div>
           </el-upload>
         </el-form-item>
         <el-form-item label="备注" prop="remark">
@@ -116,16 +140,49 @@
         <el-button @click="cancel">取 消</el-button>
       </div>
     </el-dialog>
+
+    <el-dialog title="OCR识别详情" :visible.sync="detailOpen" width="700px" append-to-body>
+      <el-form ref="detailForm" :model="detailForm" label-width="100px" size="mini">
+        <el-row>
+          <el-col :span="24">
+            <el-form-item label="文档名称：">{{ detailForm.documentName }}</el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="识别状态：">
+              <el-tag v-if="detailForm.isRecognized === 1" type="success">已识别</el-tag>
+              <el-tag v-else type="info">未识别</el-tag>
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="识别时间：">{{ parseTime(detailForm.ocrTime) }}</el-form-item>
+          </el-col>
+          <el-col :span="24">
+            <el-form-item label="识别结果：">
+              <el-input
+                type="textarea"
+                :rows="15"
+                v-model="detailForm.ocrContent"
+                readonly
+                placeholder="暂无识别内容"
+              />
+            </el-form-item>
+          </el-col>
+        </el-row>
+      </el-form>
+      <div slot="footer" class="dialog-footer">
+        <el-button @click="detailOpen = false">关 闭</el-button>
+      </div>
+    </el-dialog>
+
   </div>
 </template>
 
 <script>
-import { listDocument, addDocument, delDocument } from "@/api/system/document";
+import { listDocument, addDocument, delDocument, ocrDocument, getDocument } from "@/api/system/document";
 import { getToken } from "@/utils/auth";
 
 export default {
   name: "Document",
-  //dicts: ['sys_normal_disable'],
   data() {
     return {
       // 遮罩层
@@ -146,6 +203,10 @@ export default {
       title: "",
       // 是否显示弹出层
       open: false,
+      // OCR详情弹窗开关
+      detailOpen: false,
+      // 详情数据对象
+      detailForm: {},
       // 查询参数
       queryParams: {
         pageNum: 1,
@@ -163,7 +224,7 @@ export default {
           { required: true, message: "请上传文件", trigger: "blur" }
         ]
       },
-      // 上传参数   oss上传改为：/common/upload/oss
+      // 上传参数
       uploadUrl: process.env.VUE_APP_BASE_API + "/common/upload",
       headers: {
         Authorization: "Bearer " + getToken()
@@ -246,27 +307,44 @@ export default {
         this.$modal.msgSuccess("删除成功");
       }).catch(() => {});
     },
-    // /** 下载按钮操作 */
-    // handleDownload(row) {
-    //   this.download(row.filePath, row.documentName + "." + row.fileSuffix);
-    // },
     /** 下载按钮操作 */
     handleDownload(row) {
-      // 使用 $download.resource (GET请求) 匹配后端接口
       this.$download.resource(row.filePath);
+    },
+    /** OCR识别按钮操作 */
+    handleOcr(row) {
+      const documentId = row.documentId;
+      const loading = this.$loading({
+        lock: true,
+        text: '正在请求识别服务...',
+        spinner: 'el-icon-loading',
+        background: 'rgba(0, 0, 0, 0.7)'
+      });
+
+      ocrDocument(documentId).then(response => {
+        loading.close();
+        this.$modal.msgSuccess("识别请求已提交（模拟成功）");
+        this.getList(); // 刷新列表查看状态变化
+      }).catch(() => {
+        loading.close();
+      });
+    },
+    /** 查看详情操作 */
+    handleDetail(row) {
+      this.reset();
+      const documentId = row.documentId;
+      getDocument(documentId).then(response => {
+        this.detailForm = response.data;
+        this.detailOpen = true;
+      });
     },
     // 上传前校验
     handleBeforeUpload(file) {
-      const isPDF = file.type === "application/pdf";
       const isLt50M = file.size / 1024 / 1024 < 50;
-
-      if (!isPDF) {
-        this.$message.error("上传文档只能是 PDF 格式!");
-      }
       if (!isLt50M) {
-        this.$message.error("上传文档大小不能超过 50MB!");
+        this.$message.error("上传文件大小不能超过 50MB!");
       }
-      return isPDF && isLt50M;
+      return isLt50M;
     },
     // 上传成功回调
     handleUploadSuccess(res, file) {

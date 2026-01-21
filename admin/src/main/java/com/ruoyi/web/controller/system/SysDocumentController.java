@@ -43,11 +43,30 @@ public class SysDocumentController extends BaseController
         return toAjax(documentService.insertDocument(document));
     }
 
+    // 【新增】OCR 识别接口
+    @PreAuthorize("@ss.hasPermi('system:document:edit')") // 借用 edit 权限，或新增权限字符
+    @Log(title = "OCR识别", businessType = BusinessType.UPDATE)
+    @PostMapping("/ocr/{documentId}")
+    public AjaxResult ocr(@PathVariable Long documentId)
+    {
+        return toAjax(documentService.ocrDocument(documentId));
+    }
+
     @PreAuthorize("@ss.hasPermi('system:document:remove')")
     @Log(title = "文档管理", businessType = BusinessType.DELETE)
     @DeleteMapping("/{documentIds}")
     public AjaxResult remove(@PathVariable Long[] documentIds)
     {
         return toAjax(documentService.deleteDocumentByIds(documentIds));
+    }
+
+    /**
+     * 获取文档管理详细信息
+     */
+    @PreAuthorize("@ss.hasPermi('system:document:query')")
+    @GetMapping(value = "/{documentId}")
+    public AjaxResult getInfo(@PathVariable("documentId") Long documentId)
+    {
+        return AjaxResult.success(documentService.selectDocumentById(documentId));
     }
 }

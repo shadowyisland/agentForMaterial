@@ -13,10 +13,14 @@
         <result property="createBy"      column="create_by"      />
         <result property="createTime"    column="create_time"    />
         <result property="remark"        column="remark"         />
+        <result property="isRecognized"  column="is_recognized"  />
+        <result property="ocrContent"    column="ocr_content"    />
+        <result property="ocrTime"       column="ocr_time"       />
+        <result property="ocrError"      column="ocr_error"      />
     </resultMap>
 
     <sql id="selectDocumentVo">
-        select document_id, document_name, file_path, file_origin_name, file_suffix, create_by, create_time, remark from sys_document
+        select document_id, document_name, file_path, file_origin_name, file_suffix, create_by, create_time, remark, is_recognized, ocr_content, ocr_time, ocr_error from sys_document
     </sql>
 
     <select id="selectDocumentList" parameterType="SysDocument" resultMap="SysDocumentResult">
@@ -31,6 +35,24 @@
         <include refid="selectDocumentVo"/>
         where document_id = #{documentId}
     </select>
+
+    <update id="updateDocument" parameterType="SysDocument">
+        update sys_document
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="documentName != null">document_name = #{documentName},</if>
+            <if test="filePath != null">file_path = #{filePath},</if>
+            <if test="fileOriginName != null">file_origin_name = #{fileOriginName},</if>
+            <if test="fileSuffix != null">file_suffix = #{fileSuffix},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            <if test="isRecognized != null">is_recognized = #{isRecognized},</if>
+            <if test="ocrContent != null">ocr_content = #{ocrContent},</if>
+            <if test="ocrTime != null">ocr_time = #{ocrTime},</if>
+            <if test="ocrError != null">ocr_error = #{ocrError},</if>
+            <if test="updateBy != null">update_by = #{updateBy},</if>
+            <if test="updateTime != null">update_time = #{updateTime},</if>
+        </trim>
+        where document_id = #{documentId}
+    </update>
 
     <insert id="insertDocument" parameterType="SysDocument" useGeneratedKeys="true" keyProperty="documentId">
         insert into sys_document

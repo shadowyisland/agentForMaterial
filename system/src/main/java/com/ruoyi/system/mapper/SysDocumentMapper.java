@@ -27,6 +27,13 @@ public interface SysDocumentMapper
     public int insertDocument(SysDocument document);
 
     /**
+     * 【新增】修改文档 (用于更新OCR状态)
+     * * @param document 文档信息
+     * @return 结果
+     */
+    public int updateDocument(SysDocument document);
+
+    /**
      * 批量删除文档
      * * @param documentIds 需要删除的数据ID
      * @return 结果
