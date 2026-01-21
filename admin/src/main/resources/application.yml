@@ -134,3 +134,16 @@ xss:
   excludes: /system/notice
   # 匹配链接
   urlPatterns: /system/*,/monitor/*,/tool/*
+
+baidu:
+  api:
+    key: 0SMBWhYN5WqqExhibIjt3V1P
+    secret: l0ppCJapzkxSi7H89fEM42Bk97ZqEDl4
+
+aliyun:
+  oss:
+    file:
+      endpoint: oss-cn-shanghai.aliyuncs.com
+      keyid: LTAI5tChWDG1XMd1PYntErrJ
+      keysecret: XEIsPtRbSpo4qpIe0gV2zdCx5Be1ov
+      bucketname: kkmaterial1
