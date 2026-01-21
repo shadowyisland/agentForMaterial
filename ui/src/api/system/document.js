@@ -25,3 +25,19 @@ export function delDocument(documentId) {
     method: 'delete'
   })
 }
+
+// 【新增】OCR识别请求
+export function ocrDocument(documentId) {
+  return request({
+    url: '/system/document/ocr/' + documentId,
+    method: 'post'
+  })
+}
+
+// 查询文档管理详细
+export function getDocument(documentId) {
+  return request({
+    url: '/system/document/' + documentId,
+    method: 'get'
+  })
+}

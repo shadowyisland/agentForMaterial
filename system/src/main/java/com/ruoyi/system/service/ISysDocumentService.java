@@ -27,9 +27,23 @@ public interface ISysDocumentService
     public int insertDocument(SysDocument document);
 
     /**
+     * 【新增】修改文档
+     * * @param document 文档信息
+     * @return 结果
+     */
+    public int updateDocument(SysDocument document);
+
+    /**
      * 批量删除文档
      * * @param documentIds 需要删除的文档ID
      * @return 结果
      */
     public int deleteDocumentByIds(Long[] documentIds);
+
+    /**
+     * 【新增】执行OCR识别 (目前为空操作)
+     * * @param documentId 文档ID
+     * @return 结果
+     */
+    public int ocrDocument(Long documentId);
 }
