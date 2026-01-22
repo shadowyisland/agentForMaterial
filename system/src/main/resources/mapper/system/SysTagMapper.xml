@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.system.mapper.SysTagMapper">
+
+    <resultMap type="SysTag" id="SysTagResult">
+        <result property="tagId"    column="tag_id"    />
+        <result property="ownerUserId"    column="owner_user_id"    />
+        <result property="tagName"    column="tag_name"    />
+        <result property="tagKey"    column="tag_key"    />
+    </resultMap>
+
+    <select id="checkTagUnique" resultMap="SysTagResult">
+        SELECT tag_id, tag_name FROM sys_tag
+        WHERE owner_user_id = #{userId} AND tag_key = #{tagKey}
+            LIMIT 1
+    </select>
+
+    <insert id="insertTag" parameterType="SysTag" useGeneratedKeys="true" keyProperty="tagId">
+        INSERT INTO sys_tag(
+        <if test="ownerUserId != null">owner_user_id,</if>
+        <if test="tagName != null">tag_name,</if>
+        <if test="createBy != null">create_by,</if>
+        create_time
+        ) VALUES (
+        <if test="ownerUserId != null">#{ownerUserId},</if>
+        <if test="tagName != null">#{tagName},</if>
+        <if test="createBy != null">#{createBy},</if>
+        sysdate()
+        )
+    </insert>
+
+    <select id="selectTagsByUserId" resultType="String">
+        SELECT t.tag_name
+        FROM sys_tag t
+                 LEFT JOIN sys_document_tag dt ON t.tag_id = dt.tag_id
+        WHERE t.owner_user_id = #{userId}
+        GROUP BY t.tag_id, t.tag_name
+        ORDER BY COUNT(dt.document_id) DESC
+    </select>
+
+    <insert id="insertDocTag">
+        INSERT INTO sys_document_tag(document_id, tag_id) VALUES (#{documentId}, #{tagId})
+    </insert>
+
+</mapper>
