@@ -1,4 +1,4 @@
-package com.ruoyi.framework.web.service;
+package com.ruoyi.common.ocr;
 
 import com.baidu.aip.ocr.AipOcr;
 import org.json.JSONArray;
