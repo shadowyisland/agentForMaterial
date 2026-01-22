@@ -1,5 +1,7 @@
 package com.ruoyi.system.service.impl;
 
+import java.awt.image.BufferedImage;
+import java.io.File;
 import java.util.List;
 
 import com.ruoyi.common.config.RuoYiConfig;
@@ -13,6 +15,12 @@ import com.ruoyi.system.domain.SysDocument;
 import com.ruoyi.system.service.ISysDocumentService;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.ocr.BaiduOcrService;
+import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.rendering.ImageType;
+import org.apache.pdfbox.rendering.PDFRenderer;
+import java.io.IOException;
+
+import javax.imageio.ImageIO;
 
 @Service
 public class SysDocumentServiceImpl implements ISysDocumentService
@@ -58,30 +66,88 @@ public class SysDocumentServiceImpl implements ISysDocumentService
             throw new ServiceException("文档不存在");
         }
 
-        // TODO: 真正的OCR调用逻辑应在此处编写 (调用百度API等)
-        // 目前阶段：直接模拟识别成功，以便前端测试
-
-        // 1. 获取文件的本地绝对路径
         String filePath = doc.getFilePath();
         if (StringUtils.isEmpty(filePath)) {
             throw new ServiceException("文件路径为空，无法识别");
         }
 
-        // 将虚拟路径 /profile/upload/2026/... 转换为本地绝对路径 D:/ruoyi/uploadPath/upload/2026/...
-        // Constants.RESOURCE_PREFIX 默认为 "/profile"
+        // 1. 获取本地绝对路径
         String localPath = RuoYiConfig.getProfile() + StringUtils.substringAfter(filePath, Constants.RESOURCE_PREFIX);
+        File file = new File(localPath);
+        if (!file.exists()) {
+            throw new ServiceException("文件不存在: " + localPath);
+        }
 
-        // 2. 调用百度OCR服务
-        // 注意：OCR识别可能较慢，建议在生产环境中使用异步任务处理，这里为了演示直接同步调用
-        String result = baiduOcrService.recognizeGeneral(localPath);
+        String resultContent = "";
 
-        // 3. 更新数据库状态
-        doc.setIsRecognized(1); // 标记为已识别
-        doc.setOcrContent(result);
+        try {
+            // 2. 判断是否为 PDF
+            if (localPath.toLowerCase().endsWith(".pdf")) {
+                // 如果是 PDF，调用 PDF 处理逻辑
+                resultContent = processPdfAndOcr(file);
+            } else {
+                // 如果是普通图片，直接调用 OCR
+                resultContent = baiduOcrService.recognizeGeneral(localPath);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            throw new ServiceException("识别过程中发生错误: " + e.getMessage());
+        }
+
+        // 3. 更新数据库
+        doc.setIsRecognized(1);
+        doc.setOcrContent(resultContent);
         doc.setOcrTime(DateUtils.getNowDate());
-        // 如果识别结果包含"失败"字样，你也可以选择记录到 Error 字段
-        // doc.setOcrError(...);
 
         return documentMapper.updateDocument(doc);
+    }
+    /**
+     * 辅助方法：处理 PDF 文件 (拆分 -> 转图 -> 识别 -> 拼接)
+     */
+    private String processPdfAndOcr(File pdfFile) throws IOException {
+        StringBuilder fullText = new StringBuilder();
+        PDDocument document = null;
+
+        try {
+            // 加载 PDF
+            document = PDDocument.load(pdfFile);
+            PDFRenderer pdfRenderer = new PDFRenderer(document);
+            int pageCount = document.getNumberOfPages();
+
+            // 限制最大页数，防止 PDF 过大导致超时 (可选)
+            if (pageCount > 20) {
+                fullText.append("[警告] PDF页数过多(").append(pageCount).append(")，仅识别前 20 页...\n\n");
+                pageCount = 20;
+            }
+
+            // 循环处理每一页
+            for (int i = 0; i < pageCount; i++) {
+                // 1. 将 PDF 页渲染为图片 (300 DPI 清晰度较高，适合 OCR)
+                BufferedImage bim = pdfRenderer.renderImageWithDPI(i, 300, ImageType.RGB);
+
+                // 2. 创建临时文件保存图片
+                File tempFile = File.createTempFile("ocr_temp_page_" + i, ".jpg");
+                ImageIO.write(bim, "jpg", tempFile);
+
+                // 3. 调用 OCR 识别该临时图片
+                String pageResult = baiduOcrService.recognizeGeneral(tempFile.getAbsolutePath());
+
+                // 4. 拼接结果
+                fullText.append("=== 第 ").append(i + 1).append(" 页 ===\n");
+                fullText.append(pageResult).append("\n\n");
+
+                // 5. 删除临时文件
+                tempFile.delete();
+            }
+        } catch (Exception e) {
+            fullText.append("PDF 解析失败: ").append(e.getMessage());
+            throw e;
+        } finally {
+            if (document != null) {
+                document.close();
+            }
+        }
+
+        return fullText.toString();
     }
 }
