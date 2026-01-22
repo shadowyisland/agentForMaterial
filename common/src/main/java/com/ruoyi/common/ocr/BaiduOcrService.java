@@ -67,7 +67,7 @@ public class BaiduOcrService {
             options.put("detect_language", "true");
             options.put("probability", "true");
 
-            JSONObject res = client.basicGeneral(localFilePath, options);
+            JSONObject res = client.accurateGeneral(localFilePath, options);
 
             StringBuilder sb = new StringBuilder();
             if (res.has("words_result")) {
