@@ -19,35 +19,35 @@ public class BaiduOcrService {
 
     private static final Logger log = LoggerFactory.getLogger(BaiduOcrService.class);
 
-    @Value("${baidu.ocr.app-id:#{null}}")
-    private String appId;
+    // 1. AppID 直接设为 null
+    private static final String APP_ID = null;
 
-    @Value("${baidu.ocr.api-key:#{null}}")
+    // 2. 修改配置读取路径，匹配你的 YAML: baidu.api.key
+    @Value("${baidu.api.key:#{null}}")
     private String apiKey;
 
-    @Value("${baidu.ocr.secret-key:#{null}}")
+    @Value("${baidu.api.secret:#{null}}")
     private String secretKey;
 
     private AipOcr client;
 
     @PostConstruct
     public void init() {
-        // 增加判空逻辑。如果配置为空，打印警告但不阻断启动
-        if (appId == null || apiKey == null || secretKey == null) {
-            log.warn("========== 警告：百度OCR配置缺失，OCR功能将不可用，但系统已正常启动 ==========");
-            // 如果你希望即使参数为空也强行初始化 client (像你发的那个项目一样)，可以解开下面这行：
-            // client = new AipOcr(appId, apiKey, secretKey);
+        // 3. 移除 appId 的非空检查，只检查 Key 和 Secret
+        if (apiKey == null || secretKey == null) {
+            log.warn("========== 警告：百度OCR配置缺失 (Key/Secret)，功能不可用 ==========");
             return;
         }
 
-        // 正常初始化
         try {
-            // 初始化一个AipOcr
-            client = new AipOcr(appId, apiKey, secretKey);
-            // 可选：设置网络连接参数
+            // 4. 初始化时，第一个参数传 null
+            client = new AipOcr(APP_ID, apiKey, secretKey);
+
+            // 设置超时参数
             client.setConnectionTimeoutInMillis(2000);
             client.setSocketTimeoutInMillis(60000);
-            log.info("百度OCR服务初始化成功");
+
+            log.info("百度OCR服务初始化成功 (无AppID模式)");
         } catch (Exception e) {
             log.error("百度OCR SDK初始化失败", e);
         }
@@ -55,26 +55,20 @@ public class BaiduOcrService {
 
     /**
      * 通用文字识别（本地文件）
-     * @param localFilePath 本地文件绝对路径
-     * @return 识别结果字符串
      */
     public String recognizeGeneral(String localFilePath) {
-        // 使用前先检查 client 是否初始化
         if (client == null) {
-            return "识别失败: OCR服务未配置 (AppID/Key/Secret为空)";
+            return "识别失败: OCR服务未配置 (Key/Secret为空)";
         }
         try {
-            // 传入可选参数调用接口
             HashMap<String, String> options = new HashMap<String, String>();
             options.put("language_type", "CHN_ENG");
             options.put("detect_direction", "true");
             options.put("detect_language", "true");
             options.put("probability", "true");
 
-            // 调用接口
             JSONObject res = client.basicGeneral(localFilePath, options);
 
-            // 解析返回结果
             StringBuilder sb = new StringBuilder();
             if (res.has("words_result")) {
                 JSONArray wordsResult = res.getJSONArray("words_result");
@@ -82,9 +76,11 @@ public class BaiduOcrService {
                     JSONObject word = wordsResult.getJSONObject(i);
                     sb.append(word.getString("words")).append("\n");
                 }
+            } else if (res.has("error_msg")) {
+                // 处理百度返回的错误信息
+                return "识别失败: " + res.getString("error_msg");
             } else {
-                log.error("OCR识别失败或无结果: {}", res.toString());
-                return "识别失败: " + res.toString();
+                return "识别失败: 未知响应 " + res.toString();
             }
             return sb.toString();
 
