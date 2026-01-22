@@ -12,6 +12,23 @@
               @keyup.enter.native="handleQuery"
             />
           </el-form-item>
+          <el-form-item label="标签筛选" prop="searchTag">
+            <el-select
+              v-model="queryParams.searchTag"
+              placeholder="选择或输入标签"
+              clearable
+              filterable
+              style="width: 200px"
+              @change="handleQuery"
+            >
+              <el-option
+                v-for="item in allUserTags"
+                :key="item"
+                :label="item"
+                :value="item"
+              />
+            </el-select>
+          </el-form-item>
           <el-form-item>
             <el-button type="primary" icon="el-icon-search" size="mini" @click="handleQuery">搜索</el-button>
             <el-button icon="el-icon-refresh" size="mini" @click="resetQuery">重置</el-button>
@@ -303,6 +320,7 @@ export default {
   },
   created() {
     this.getList();
+    this.getTagsList();
   },
   computed: {
     // 计算属性：决定显示哪些快捷标签（前10个 或 全部）
@@ -315,6 +333,13 @@ export default {
     }
   },
   methods: {
+    /** 获取所有标签列表 */
+    getTagsList() {
+      getTopTags().then(res => {
+        this.allUserTags = res.data || [];
+      });
+    },
+
     /** 查询文档列表 */
     getList() {
       this.loading = true;
@@ -367,6 +392,7 @@ export default {
       
       // 打开弹窗时，获取最新的常用标签
       this.showAllTags = false;
+      this.getTagsList();
       // 调用我们在 API 里新增的接口
       getTopTags().then(res => {
         // 假设后端返回 ["TagA", "TagB", ...]

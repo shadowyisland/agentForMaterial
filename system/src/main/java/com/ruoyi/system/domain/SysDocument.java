@@ -80,6 +80,7 @@ public class SysDocument extends BaseEntity {
      */
     @Excel(name = "状态")
     private String status;
+    private String searchTag;
 
     // --- 新增代码 Start ---
     /**
@@ -190,6 +191,14 @@ public class SysDocument extends BaseEntity {
 
     public void setOcrError(String ocrError) {
         this.ocrError = ocrError;
+    }
+
+    public String getSearchTag() {
+        return searchTag;
+    }
+
+    public void setSearchTag(String searchTag) {
+        this.searchTag = searchTag;
     }
 
     @Override

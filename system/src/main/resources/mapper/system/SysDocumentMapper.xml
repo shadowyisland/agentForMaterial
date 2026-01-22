@@ -29,6 +29,17 @@
         <include refid="selectDocumentVo"/>
         <where>
             <if test="documentName != null  and documentName != ''"> and document_name like concat('%', #{documentName}, '%')</if>
+            <if test="documentName != null  and documentName != ''"> and document_name like concat('%', #{documentName}, '%')</if>
+
+            <if test="searchTag != null and searchTag != ''">
+                AND document_id IN (
+                SELECT dt.document_id
+                FROM sys_document_tag dt
+                LEFT JOIN sys_tag t ON dt.tag_id = t.tag_id
+                WHERE t.tag_name LIKE concat('%', #{searchTag}, '%')
+                )
+            </if>
+            <if test="fileOriginName != null  and fileOriginName != ''"> and file_origin_name like concat('%', #{fileOriginName}, '%')</if>
         </where>
         order by create_time desc
     </select>
