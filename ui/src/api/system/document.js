@@ -43,6 +43,14 @@ export function updateDocument(data) {
   })
 }
 
+// 【新增】OCR识别请求
+export function ocrDocument(documentId) {
+  return request({
+    url: '/system/document/ocr/' + documentId,
+    method: 'post'
+  })
+}
+
 // 删除文档管理
 export function delDocument(documentId) {
   return request({

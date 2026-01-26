@@ -2,30 +2,30 @@ package com.ruoyi.system.service.impl;
 
 import java.awt.image.BufferedImage;
 import java.io.File;
+import java.io.IOException;
 import java.util.List;
 
-import com.ruoyi.common.config.RuoYiConfig;
-import com.ruoyi.common.constant.Constants;
-import com.ruoyi.common.utils.DateUtils;
-import com.ruoyi.common.utils.SecurityUtils;
-import com.ruoyi.common.utils.StringUtils;
-import com.ruoyi.system.domain.SysTag;
-import com.ruoyi.system.mapper.SysTagMapper;
-import com.ruoyi.common.utils.StringUtils;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
-import com.ruoyi.system.mapper.SysDocumentMapper;
-import com.ruoyi.system.domain.SysDocument;
-import com.ruoyi.system.service.ISysDocumentService;
-import com.ruoyi.common.exception.ServiceException;
-import org.springframework.transaction.annotation.Transactional;
-import com.ruoyi.common.ocr.BaiduOcrService;
+import javax.imageio.ImageIO;
+
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.rendering.ImageType;
 import org.apache.pdfbox.rendering.PDFRenderer;
-import java.io.IOException;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
-import javax.imageio.ImageIO;
+import com.ruoyi.common.config.RuoYiConfig;
+import com.ruoyi.common.constant.Constants;
+import com.ruoyi.common.exception.ServiceException;
+import com.ruoyi.common.ocr.BaiduOcrService;
+import com.ruoyi.common.utils.DateUtils;
+import com.ruoyi.common.utils.SecurityUtils;
+import com.ruoyi.common.utils.StringUtils;
+import com.ruoyi.system.domain.SysDocument;
+import com.ruoyi.system.domain.SysTag;
+import com.ruoyi.system.mapper.SysDocumentMapper;
+import com.ruoyi.system.mapper.SysTagMapper;
+import com.ruoyi.system.service.ISysDocumentService;
 
 /**
  * 文档管理Service业务层处理
@@ -102,8 +102,6 @@ public class SysDocumentServiceImpl implements ISysDocumentService {
     @Override
     public int updateDocument(SysDocument document) {
         document.setUpdateTime(DateUtils.getNowDate());
-        // 注意：如果修改文档时也允许修改标签，这里也需要加类似的标签处理逻辑
-        // 目前版本暂只处理新增时的标签
         return documentMapper.updateDocument(document);
     }
 
@@ -115,7 +113,7 @@ public class SysDocumentServiceImpl implements ISysDocumentService {
     }
 
     /**
-     * OCR 识别逻辑 (保留你原有的代码)
+     * OCR 识别逻辑
      */
     @Override
     public int ocrDocument(Long documentId) {
@@ -152,18 +150,6 @@ public class SysDocumentServiceImpl implements ISysDocumentService {
             throw new ServiceException("识别过程中发生错误: " + e.getMessage());
         }
 
-            // 模拟返回结果
-            String mockResult = "【开发模式】这是模拟的OCR识别结果。\n" +
-                    "文档ID: " + documentId + "\n" +
-                    "识别时间: " + DateUtils.getTime();
-
-            // 更新数据库状态
-            doc.setIsRecognized(1); // 1表示已识别
-            doc.setOcrContent(mockResult);
-            // 注意：SysDocument 实体类里要有 ocrTime 和 ocrError 字段，否则这里会爆红
-            // 如果实体类还没加这俩字段，请先注释掉下面两行
-            // doc.setOcrTime(DateUtils.getNowDate());
-            // doc.setOcrError(null);
         // 3. 更新数据库
         doc.setIsRecognized(1);
         doc.setOcrContent(resultContent);
@@ -171,6 +157,7 @@ public class SysDocumentServiceImpl implements ISysDocumentService {
 
         return documentMapper.updateDocument(doc);
     }
+
     /**
      * 辅助方法：处理 PDF 文件 (拆分 -> 转图 -> 识别 -> 拼接)
      */
@@ -211,7 +198,7 @@ public class SysDocumentServiceImpl implements ISysDocumentService {
             }
         } catch (Exception e) {
             fullText.append("PDF 解析失败: ").append(e.getMessage());
-            throw e;
+            throw e; // 继续抛出异常，让外层捕获
         } finally {
             if (document != null) {
                 document.close();

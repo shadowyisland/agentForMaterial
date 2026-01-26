@@ -33,7 +33,7 @@ public class SysDocumentController extends BaseController
     private ISysDocumentService sysDocumentService;
 
     @Autowired
-    private SysTagMapper sysTagMapper; // 直接注入Mapper查询标签，简单高效
+    private SysTagMapper sysTagMapper;
 
     /**
      * 获取常用标签列表（Top）
@@ -91,6 +91,17 @@ public class SysDocumentController extends BaseController
     {
         sysDocument.setCreateBy(getUsername());
         return toAjax(sysDocumentService.insertDocument(sysDocument));
+    }
+
+    /**
+     * OCR 识别接口
+     */
+    @PreAuthorize("@ss.hasPermi('system:document:edit')")
+    @Log(title = "OCR识别", businessType = BusinessType.UPDATE)
+    @PostMapping("/ocr/{documentId}")
+    public AjaxResult ocr(@PathVariable("documentId") Long documentId)
+    {
+        return toAjax(sysDocumentService.ocrDocument(documentId));
     }
 
     /**
