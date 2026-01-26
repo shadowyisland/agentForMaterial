@@ -69,6 +69,8 @@ CREATE TABLE `sys_tag` (
   `tag_key` varchar(64)
     GENERATED ALWAYS AS (LOWER(TRIM(`tag_name`))) STORED
     COMMENT '规范化key(用于用户内去重/检索)',
+
+  `create_by` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT '' COMMENT '创建者',
   `create_time` datetime NULL DEFAULT NULL COMMENT '创建时间',
   `update_time` datetime NULL DEFAULT NULL COMMENT '更新时间',
   `del_flag` char(1) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '0' COMMENT '删除标志(0存在2删除)',
