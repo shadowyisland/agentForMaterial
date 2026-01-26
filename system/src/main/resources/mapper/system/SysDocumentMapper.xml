@@ -17,6 +17,8 @@
         <result property="ocrContent"    column="ocr_content"    />
         <result property="ocrTime"       column="ocr_time"       />
         <result property="ocrError"      column="ocr_error"      />
+        <result property="status"        column="status"         />
+        <collection property="tags" javaType="java.util.List" ofType="String" select="selectTagsByDocId" column="document_id"/>
     </resultMap>
 
     <sql id="selectDocumentVo">
@@ -27,6 +29,17 @@
         <include refid="selectDocumentVo"/>
         <where>
             <if test="documentName != null  and documentName != ''"> and document_name like concat('%', #{documentName}, '%')</if>
+            <if test="documentName != null  and documentName != ''"> and document_name like concat('%', #{documentName}, '%')</if>
+
+            <if test="searchTag != null and searchTag != ''">
+                AND document_id IN (
+                SELECT dt.document_id
+                FROM sys_document_tag dt
+                LEFT JOIN sys_tag t ON dt.tag_id = t.tag_id
+                WHERE t.tag_name LIKE concat('%', #{searchTag}, '%')
+                )
+            </if>
+            <if test="fileOriginName != null  and fileOriginName != ''"> and file_origin_name like concat('%', #{fileOriginName}, '%')</if>
         </where>
         order by create_time desc
     </select>
@@ -82,4 +95,11 @@
             #{documentId}
         </foreach>
     </delete>
+
+    <select id="selectTagsByDocId" parameterType="Long" resultType="String">
+        SELECT t.tag_name
+        FROM sys_tag t
+                 LEFT JOIN sys_document_tag dt ON t.tag_id = dt.tag_id
+        WHERE dt.document_id = #{documentId}
+    </select>
 </mapper>

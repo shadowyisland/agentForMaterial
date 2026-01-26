@@ -1,6 +1,6 @@
 import request from '@/utils/request'
 
-// 查询文档列表
+// 查询文档管理列表
 export function listDocument(query) {
   return request({
     url: '/system/document/list',
@@ -9,7 +9,23 @@ export function listDocument(query) {
   })
 }
 
-// 新增文档
+// 获取常用标签
+export function getTopTags() {
+  return request({
+    url: '/system/document/tags/top',
+    method: 'get'
+  })
+}
+
+// 查询文档管理详细
+export function getDocument(documentId) {
+  return request({
+    url: '/system/document/' + documentId,
+    method: 'get'
+  })
+}
+
+// 新增文档管理
 export function addDocument(data) {
   return request({
     url: '/system/document',
@@ -18,11 +34,12 @@ export function addDocument(data) {
   })
 }
 
-// 删除文档
-export function delDocument(documentId) {
+// 修改文档管理
+export function updateDocument(data) {
   return request({
-    url: '/system/document/' + documentId,
-    method: 'delete'
+    url: '/system/document',
+    method: 'put',
+    data: data
   })
 }
 
@@ -34,10 +51,10 @@ export function ocrDocument(documentId) {
   })
 }
 
-// 查询文档管理详细
-export function getDocument(documentId) {
+// 删除文档管理
+export function delDocument(documentId) {
   return request({
     url: '/system/document/' + documentId,
-    method: 'get'
+    method: 'delete'
   })
 }

@@ -2,35 +2,46 @@ package com.ruoyi.system.service.impl;
 
 import java.awt.image.BufferedImage;
 import java.io.File;
-import java.util.List;
-
-import com.ruoyi.common.config.RuoYiConfig;
-import com.ruoyi.common.constant.Constants;
-import com.ruoyi.common.utils.DateUtils;
-import com.ruoyi.common.utils.StringUtils;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
-import com.ruoyi.system.mapper.SysDocumentMapper;
-import com.ruoyi.system.domain.SysDocument;
-import com.ruoyi.system.service.ISysDocumentService;
-import com.ruoyi.common.exception.ServiceException;
-import com.ruoyi.common.ocr.BaiduOcrService;
-import org.apache.pdfbox.pdmodel.PDDocument;
-import org.apache.pdfbox.rendering.ImageType;
-import org.apache.pdfbox.rendering.PDFRenderer;
 import java.io.IOException;
+import java.util.List;
 
 import javax.imageio.ImageIO;
 
+import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.rendering.ImageType;
+import org.apache.pdfbox.rendering.PDFRenderer;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import com.ruoyi.common.config.RuoYiConfig;
+import com.ruoyi.common.constant.Constants;
+import com.ruoyi.common.exception.ServiceException;
+import com.ruoyi.common.ocr.BaiduOcrService;
+import com.ruoyi.common.utils.DateUtils;
+import com.ruoyi.common.utils.SecurityUtils;
+import com.ruoyi.common.utils.StringUtils;
+import com.ruoyi.system.domain.SysDocument;
+import com.ruoyi.system.domain.SysTag;
+import com.ruoyi.system.mapper.SysDocumentMapper;
+import com.ruoyi.system.mapper.SysTagMapper;
+import com.ruoyi.system.service.ISysDocumentService;
+
+/**
+ * 文档管理Service业务层处理
+ */
 @Service
-public class SysDocumentServiceImpl implements ISysDocumentService
-{
+public class SysDocumentServiceImpl implements ISysDocumentService {
+
     @Autowired
     private SysDocumentMapper documentMapper;
 
     // 注入百度OCR服务
     @Autowired
     private BaiduOcrService baiduOcrService;
+
+    @Autowired
+    private SysTagMapper sysTagMapper; // 引入标签Mapper
 
     @Override
     public SysDocument selectDocumentById(Long documentId) {
@@ -42,10 +53,50 @@ public class SysDocumentServiceImpl implements ISysDocumentService
         return documentMapper.selectDocumentList(document);
     }
 
+    /**
+     * 新增文档（包含标签处理逻辑）
+     */
     @Override
+    @Transactional // 开启事务，确保文档和标签同时成功
     public int insertDocument(SysDocument document) {
         document.setCreateTime(DateUtils.getNowDate());
-        return documentMapper.insertDocument(document);
+        // 1. 保存文档基础信息
+        int rows = documentMapper.insertDocument(document);
+
+        // 2. 处理标签逻辑 (新增部分)
+        if (document.getTags() != null && !document.getTags().isEmpty()) {
+            Long userId = SecurityUtils.getUserId(); // 获取当前登录用户
+
+            for (String tagName : document.getTags()) {
+                if (StringUtils.isEmpty(tagName)) continue;
+
+                // 生成标准化key (去除空格，转小写) 用于查重
+                String cleanTagName = tagName.trim();
+                String tagKey = cleanTagName.toLowerCase().replaceAll("\\s+", "");
+
+                // A. 检查标签是否已存在
+                SysTag tag = sysTagMapper.checkTagUnique(userId, tagKey);
+                Long tagId;
+
+                if (tag == null) {
+                    // B. 不存在，创建新标签
+                    tag = new SysTag();
+                    tag.setOwnerUserId(userId);
+                    tag.setTagName(cleanTagName);
+                    tag.setTagKey(tagKey); // 记得存入 key
+                    tag.setCreateBy(document.getCreateBy());
+                    sysTagMapper.insertTag(tag);
+                    tagId = tag.getTagId(); // 获取回填的主键
+                } else {
+                    // C. 存在，直接使用ID
+                    tagId = tag.getTagId();
+                }
+
+                // D. 在中间表中建立关联
+                sysTagMapper.insertDocTag(document.getDocumentId(), tagId);
+            }
+        }
+        return rows;
     }
 
     @Override
@@ -56,9 +107,14 @@ public class SysDocumentServiceImpl implements ISysDocumentService
 
     @Override
     public int deleteDocumentByIds(Long[] documentIds) {
+        // 建议：删除文档时，最好同时也删除 sys_document_tag 表中的关联记录
+        // sysTagMapper.deleteDocTagByDocIds(documentIds);
         return documentMapper.deleteDocumentByIds(documentIds);
     }
 
+    /**
+     * OCR 识别逻辑
+     */
     @Override
     public int ocrDocument(Long documentId) {
         SysDocument doc = documentMapper.selectDocumentById(documentId);
@@ -101,6 +157,7 @@ public class SysDocumentServiceImpl implements ISysDocumentService
 
         return documentMapper.updateDocument(doc);
     }
+
     /**
      * 辅助方法：处理 PDF 文件 (拆分 -> 转图 -> 识别 -> 拼接)
      */
@@ -141,7 +198,7 @@ public class SysDocumentServiceImpl implements ISysDocumentService
             }
         } catch (Exception e) {
             fullText.append("PDF 解析失败: ").append(e.getMessage());
-            throw e;
+            throw e; // 继续抛出异常，让外层捕获
         } finally {
             if (document != null) {
                 document.close();

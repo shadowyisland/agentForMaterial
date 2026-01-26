@@ -12,6 +12,23 @@
               @keyup.enter.native="handleQuery"
             />
           </el-form-item>
+          <el-form-item label="标签筛选" prop="searchTag">
+            <el-select
+              v-model="queryParams.searchTag"
+              placeholder="选择或输入标签"
+              clearable
+              filterable
+              style="width: 200px"
+              @change="handleQuery"
+            >
+              <el-option
+                v-for="item in allUserTags"
+                :key="item"
+                :label="item"
+                :value="item"
+              />
+            </el-select>
+          </el-form-item>
           <el-form-item>
             <el-button type="primary" icon="el-icon-search" size="mini" @click="handleQuery">搜索</el-button>
             <el-button icon="el-icon-refresh" size="mini" @click="resetQuery">重置</el-button>
@@ -65,6 +82,21 @@
 
           <el-table-column label="原始文件名" align="center" prop="fileOriginName" :show-overflow-tooltip="true" />
           <el-table-column label="上传人" align="center" prop="createBy" />
+          <el-table-column label="文件标签" align="center" prop="tags" width="200">
+          <template slot-scope="scope">
+            <div v-if="scope.row.tags && scope.row.tags.length > 0">
+              <el-tag
+                v-for="(tag, index) in scope.row.tags"
+                :key="index"
+                size="mini"
+                style="margin-right: 4px; margin-bottom: 4px;"
+              >
+                {{ tag }}
+              </el-tag>
+            </div>
+            <span v-else style="color: #ccc; font-size: 12px;">无标签</span>
+          </template>
+        </el-table-column>
           <el-table-column label="上传时间" align="center" prop="createTime" width="180">
             <template slot-scope="scope">
               <span>{{ parseTime(scope.row.createTime) }}</span>
@@ -113,6 +145,7 @@
         <el-form-item label="文档名称" prop="documentName">
           <el-input v-model="form.documentName" placeholder="请输入文档显示名称" />
         </el-form-item>
+        
         <el-form-item label="文件上传" prop="filePath">
           <el-upload
             ref="upload"
@@ -130,6 +163,52 @@
             <div class="el-upload__text">将文件拖到此处，或<em>点击上传</em></div>
             <div class="el-upload__tip" slot="tip">支持 PDF/JPG/PNG，且不超过50MB</div>
           </el-upload>
+        </el-form-item>
+
+        <el-form-item label="文档标签" prop="tags">
+          <el-select
+            v-model="form.tags"
+            multiple
+            filterable
+            allow-create
+            default-first-option
+            placeholder="请选择或输入标签(回车确认)"
+            style="width: 100%"
+          >
+            <el-option
+              v-for="item in allUserTags"
+              :key="item"
+              :label="item"
+              :value="item"
+            />
+          </el-select>
+
+          <div class="tag-recommend-area" v-if="allUserTags && allUserTags.length > 0">
+            <span class="tag-title">常用标签：</span>
+            <el-tag
+              v-for="tag in visibleTags"
+              :key="tag"
+              size="small"
+              class="recommend-tag"
+              @click="handleQuickAddTag(tag)"
+              :effect="form.tags && form.tags.includes(tag) ? 'dark' : 'plain'"
+            >
+              {{ tag }}
+            </el-tag>
+
+            <el-button 
+              v-if="!showAllTags && allUserTags.length > 10" 
+              type="text" 
+              size="mini" 
+              @click="showAllTags = true"
+            >... (展开)</el-button>
+            <el-button 
+              v-if="showAllTags && allUserTags.length > 10" 
+              type="text" 
+              size="mini" 
+              @click="showAllTags = false"
+            > (收起)</el-button>
+          </div>
         </el-form-item>
         <el-form-item label="备注" prop="remark">
           <el-input v-model="form.remark" type="textarea" placeholder="请输入备注" />
@@ -178,7 +257,8 @@
 </template>
 
 <script>
-import { listDocument, addDocument, delDocument, ocrDocument, getDocument } from "@/api/system/document";
+// 注意：这里引入了 getTopTags
+import { listDocument, addDocument, delDocument, ocrDocument, getDocument, getTopTags } from "@/api/system/document";
 import { getToken } from "@/utils/auth";
 
 export default {
@@ -214,7 +294,9 @@ export default {
         documentName: undefined
       },
       // 表单参数
-      form: {},
+      form: {
+        tags: [] // 初始化标签
+      },
       // 表单校验
       rules: {
         documentName: [
@@ -229,13 +311,35 @@ export default {
       headers: {
         Authorization: "Bearer " + getToken()
       },
-      fileList: []
+      fileList: [],
+      
+      // --- 标签相关数据 ---
+      allUserTags: [], // 所有标签（从后端获取，已排序）
+      showAllTags: false // 是否展开全部标签
     };
   },
   created() {
     this.getList();
+    this.getTagsList();
+  },
+  computed: {
+    // 计算属性：决定显示哪些快捷标签（前10个 或 全部）
+    visibleTags() {
+      if (this.showAllTags) {
+        return this.allUserTags;
+      } else {
+        return this.allUserTags.slice(0, 10);
+      }
+    }
   },
   methods: {
+    /** 获取所有标签列表 */
+    getTagsList() {
+      getTopTags().then(res => {
+        this.allUserTags = res.data || [];
+      });
+    },
+
     /** 查询文档列表 */
     getList() {
       this.loading = true;
@@ -258,7 +362,8 @@ export default {
         filePath: undefined,
         fileOriginName: undefined,
         fileSuffix: undefined,
-        remark: undefined
+        remark: undefined,
+        tags: [] // 重置标签
       };
       this.fileList = [];
       this.resetForm("form");
@@ -284,6 +389,28 @@ export default {
       this.reset();
       this.open = true;
       this.title = "上传文档";
+      
+      // 打开弹窗时，获取最新的常用标签
+      this.showAllTags = false;
+      this.getTagsList();
+      // 调用我们在 API 里新增的接口
+      getTopTags().then(res => {
+        // 假设后端返回 ["TagA", "TagB", ...]
+        this.allUserTags = res.data || [];
+      });
+    },
+    /** 点击快捷标签 */
+    handleQuickAddTag(tag) {
+      if (!this.form.tags) {
+        this.$set(this.form, 'tags', []);
+      }
+      // 如果已存在则移除，不存在则添加
+      const index = this.form.tags.indexOf(tag);
+      if (index > -1) {
+        this.form.tags.splice(index, 1);
+      } else {
+        this.form.tags.push(tag);
+      }
     },
     /** 提交按钮 */
     submitForm: function() {
@@ -371,3 +498,30 @@ export default {
   }
 };
 </script>
+
+<style scoped>
+/* 标签推荐区样式 */
+.tag-recommend-area {
+  margin-top: 8px;
+  line-height: 24px;
+}
+.tag-title {
+  font-size: 12px;
+  color: #909399;
+  margin-right: 8px;
+}
+.recommend-tag {
+  margin-right: 8px;
+  margin-bottom: 5px;
+  cursor: pointer;
+  user-select: none;
+}
+.recommend-tag:hover {
+  opacity: 0.8;
+}
+/* 调整按钮样式 */
+.el-button--text {
+    padding-bottom: 0;
+    padding-top: 0;
+}
+</style>
