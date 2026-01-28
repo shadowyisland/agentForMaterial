@@ -47,7 +47,8 @@ export function updateDocument(data) {
 export function ocrDocument(documentId) {
   return request({
     url: '/system/document/ocr/' + documentId,
-    method: 'post'
+    method: 'post',
+    timeout: 100000,
   })
 }
 
