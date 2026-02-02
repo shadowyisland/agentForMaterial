@@ -147,7 +147,7 @@
         <el-form-item label="文档名称" prop="documentName">
           <el-input v-model="form.documentName" placeholder="请输入文档显示名称" />
         </el-form-item>
-        
+
         <el-form-item label="文件上传" prop="filePath">
           <el-upload
             ref="upload"
@@ -198,16 +198,16 @@
               {{ tag }}
             </el-tag>
 
-            <el-button 
-              v-if="!showAllTags && allUserTags.length > 10" 
-              type="text" 
-              size="mini" 
+            <el-button
+              v-if="!showAllTags && allUserTags.length > 10"
+              type="text"
+              size="mini"
               @click="showAllTags = true"
             >... (展开)</el-button>
-            <el-button 
-              v-if="showAllTags && allUserTags.length > 10" 
-              type="text" 
-              size="mini" 
+            <el-button
+              v-if="showAllTags && allUserTags.length > 10"
+              type="text"
+              size="mini"
               @click="showAllTags = false"
             > (收起)</el-button>
           </div>
@@ -379,7 +379,7 @@ export default {
         Authorization: "Bearer " + getToken()
       },
       fileList: [],
-      
+
       // --- 标签相关数据 ---
       allUserTags: [], 
       showAllTags: false,
