@@ -63,46 +63,70 @@ public class SysDocumentServiceImpl implements ISysDocumentService {
         // 1. 保存文档基础信息
         int rows = documentMapper.insertDocument(document);
 
-        // 2. 处理标签逻辑 (新增部分)
+        // 2. 处理标签逻辑
         if (document.getTags() != null && !document.getTags().isEmpty()) {
-            Long userId = SecurityUtils.getUserId(); // 获取当前登录用户
-
-            for (String tagName : document.getTags()) {
-                if (StringUtils.isEmpty(tagName)) continue;
-
-                // 生成标准化key (去除空格，转小写) 用于查重
-                String cleanTagName = tagName.trim();
-                String tagKey = cleanTagName.toLowerCase().replaceAll("\\s+", "");
-
-                // A. 检查标签是否已存在
-                SysTag tag = sysTagMapper.checkTagUnique(userId, tagKey);
-                Long tagId;
-
-                if (tag == null) {
-                    // B. 不存在，创建新标签
-                    tag = new SysTag();
-                    tag.setOwnerUserId(userId);
-                    tag.setTagName(cleanTagName);
-                    tag.setTagKey(tagKey); // 记得存入 key
-                    tag.setCreateBy(document.getCreateBy());
-                    sysTagMapper.insertTag(tag);
-                    tagId = tag.getTagId(); // 获取回填的主键
-                } else {
-                    // C. 存在，直接使用ID
-                    tagId = tag.getTagId();
-                }
-
-                // D. 在中间表中建立关联
-                sysTagMapper.insertDocTag(document.getDocumentId(), tagId);
-            }
+            insertTags(document.getTags(), document.getDocumentId(), document.getCreateBy());
         }
         return rows;
     }
 
+    /**
+     * 修改文档（包含标签更新逻辑）
+     */
     @Override
+    @Transactional
     public int updateDocument(SysDocument document) {
         document.setUpdateTime(DateUtils.getNowDate());
-        return documentMapper.updateDocument(document);
+        int rows = documentMapper.updateDocument(document);
+
+        // 3. 处理标签更新逻辑
+        // 只有当前端传来了 tags 字段（哪怕是空数组），才进行标签更新
+        if (document.getTags() != null) {
+            // A. 先删除该文档关联的所有旧标签
+            sysTagMapper.deleteDocTagByDocId(document.getDocumentId());
+
+            // B. 如果有新标签，则重新插入
+            if (!document.getTags().isEmpty()) {
+                insertTags(document.getTags(), document.getDocumentId(), document.getUpdateBy());
+            }
+        }
+
+        return rows;
+    }
+
+    /**
+     * 公用方法：插入标签并关联
+     */
+    private void insertTags(List<String> tags, Long documentId, String createBy) {
+        Long userId = SecurityUtils.getUserId(); // 获取当前登录用户
+
+        for (String tagName : tags) {
+            if (StringUtils.isEmpty(tagName)) continue;
+
+            // 生成标准化key (去除空格，转小写) 用于查重
+            String cleanTagName = tagName.trim();
+            String tagKey = cleanTagName.toLowerCase().replaceAll("\\s+", "");
+
+            // A. 检查标签是否已存在
+            SysTag tag = sysTagMapper.checkTagUnique(userId, tagKey);
+            Long tagId;
+
+            if (tag == null) {
+                // B. 不存在，创建新标签
+                tag = new SysTag();
+                tag.setOwnerUserId(userId);
+                tag.setTagName(cleanTagName);
+                tag.setTagKey(tagKey);
+                tag.setCreateBy(createBy);
+                sysTagMapper.insertTag(tag);
+                tagId = tag.getTagId();
+            } else {
+                tagId = tag.getTagId();
+            }
+
+            // C. 在中间表中建立关联
+            sysTagMapper.insertDocTag(documentId, tagId);
+        }
     }
 
     @Override
@@ -198,7 +222,7 @@ public class SysDocumentServiceImpl implements ISysDocumentService {
             }
         } catch (Exception e) {
             fullText.append("PDF 解析失败: ").append(e.getMessage());
-            throw e; // 继续抛出异常，让外层捕获
+            throw e;
         } finally {
             if (document != null) {
                 document.close();

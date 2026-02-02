@@ -28,4 +28,9 @@ public interface SysTagMapper
      * 关联文档和标签
      */
     public int insertDocTag(@Param("documentId") Long documentId, @Param("tagId") Long tagId);
+
+    /**
+     * 根据文档ID删除标签关联
+     */
+    public int deleteDocTagByDocId(Long documentId);
 }

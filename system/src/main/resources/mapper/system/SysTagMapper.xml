@@ -44,4 +44,8 @@
         INSERT INTO sys_document_tag(document_id, tag_id) VALUES (#{documentId}, #{tagId})
     </insert>
 
+    <delete id="deleteDocTagByDocId" parameterType="Long">
+        DELETE FROM sys_document_tag WHERE document_id = #{documentId}
+    </delete>
+
 </mapper>

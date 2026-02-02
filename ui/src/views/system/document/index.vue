@@ -82,21 +82,23 @@
 
           <el-table-column label="原始文件名" align="center" prop="fileOriginName" :show-overflow-tooltip="true" />
           <el-table-column label="上传人" align="center" prop="createBy" />
+          
           <el-table-column label="文件标签" align="center" prop="tags" width="200">
-          <template slot-scope="scope">
-            <div v-if="scope.row.tags && scope.row.tags.length > 0">
-              <el-tag
-                v-for="(tag, index) in scope.row.tags"
-                :key="index"
-                size="mini"
-                style="margin-right: 4px; margin-bottom: 4px;"
-              >
-                {{ tag }}
-              </el-tag>
-            </div>
-            <span v-else style="color: #ccc; font-size: 12px;">无标签</span>
-          </template>
-        </el-table-column>
+            <template slot-scope="scope">
+              <div v-if="scope.row.tags && scope.row.tags.length > 0">
+                <el-tag
+                  v-for="(tag, index) in scope.row.tags"
+                  :key="index"
+                  size="mini"
+                  style="margin-right: 4px; margin-bottom: 4px;"
+                >
+                  {{ tag }}
+                </el-tag>
+              </div>
+              <span v-else style="color: #ccc; font-size: 12px;">无标签</span>
+            </template>
+          </el-table-column>
+
           <el-table-column label="上传时间" align="center" prop="createTime" width="180">
             <template slot-scope="scope">
               <span>{{ parseTime(scope.row.createTime) }}</span>
@@ -220,12 +222,58 @@
       </div>
     </el-dialog>
 
-    <el-dialog title="OCR识别详情" :visible.sync="detailOpen" width="700px" append-to-body>
+    <el-dialog 
+      title="OCR识别详情与标签管理" 
+      :visible.sync="detailOpen" 
+      width="700px" 
+      append-to-body
+      @close="closeMenu"
+    >
       <el-form ref="detailForm" :model="detailForm" label-width="100px" size="mini">
         <el-row>
           <el-col :span="24">
-            <el-form-item label="文档名称：">{{ detailForm.documentName }}</el-form-item>
+            <el-form-item label="文档名称：">
+              <el-input v-model="detailForm.documentName" />
+            </el-form-item>
           </el-col>
+
+          <el-col :span="24">
+            <el-form-item label="文档标签：">
+              <el-select
+                v-model="detailForm.tags"
+                multiple
+                filterable
+                allow-create
+                default-first-option
+                placeholder="请选择或输入标签"
+                style="width: 100%"
+              >
+                <el-option
+                  v-for="item in allUserTags"
+                  :key="item"
+                  :label="item"
+                  :value="item"
+                />
+              </el-select>
+              
+              <div class="tag-recommend-area" v-if="allUserTags && allUserTags.length > 0">
+                <span class="tag-title">推荐：</span>
+                <el-tag
+                  v-for="tag in visibleTags"
+                  :key="tag"
+                  size="mini"
+                  class="recommend-tag"
+                  @click="handleQuickAddTagDetail(tag)"
+                  :effect="detailForm.tags && detailForm.tags.includes(tag) ? 'dark' : 'plain'"
+                >
+                  {{ tag }}
+                </el-tag>
+                <el-button v-if="!showAllTags && allUserTags.length > 10" type="text" size="mini" @click="showAllTags = true">展开</el-button>
+                <el-button v-if="showAllTags" type="text" size="mini" @click="showAllTags = false">收起</el-button>
+              </div>
+            </el-form-item>
+          </el-col>
+
           <el-col :span="12">
             <el-form-item label="识别状态：">
               <el-tag v-if="detailForm.isRecognized === 1" type="success">已识别</el-tag>
@@ -235,20 +283,40 @@
           <el-col :span="12">
             <el-form-item label="识别时间：">{{ parseTime(detailForm.ocrTime) }}</el-form-item>
           </el-col>
+          
           <el-col :span="24">
             <el-form-item label="识别结果：">
-              <el-input
-                type="textarea"
-                :rows="15"
-                v-model="detailForm.ocrContent"
-                readonly
-                placeholder="暂无识别内容"
-              />
+              <div class="ocr-wrapper">
+                <el-input
+                  type="textarea"
+                  :rows="15"
+                  v-model="detailForm.ocrContent"
+                  placeholder="暂无识别内容，可手动编辑。尝试选中文字可快速打标签。"
+                  @mouseup.native="handleOcrMouseUp"
+                />
+                
+                <transition name="el-zoom-in-top">
+                  <div 
+                    v-show="menuVisible" 
+                    class="ocr-context-menu" 
+                    :style="menuStyle"
+                    @mousedown.stop
+                  >
+                    <div class="menu-header">选中内容: "{{ currentSelection }}"</div>
+                    <div class="menu-buttons">
+                      <el-button type="primary" size="mini" icon="el-icon-plus" @click="addSelectionToTags">添加标签</el-button>
+                      <el-button type="warning" size="mini" icon="el-icon-refresh" @click="replaceTagsWithSelection">替换标签</el-button>
+                      <el-button type="success" size="mini" icon="el-icon-document-copy" @click="copySelection">复制</el-button>
+                    </div>
+                  </div>
+                </transition>
+              </div>
             </el-form-item>
           </el-col>
         </el-row>
       </el-form>
       <div slot="footer" class="dialog-footer">
+        <el-button type="primary" @click="submitDetailForm">保存修改</el-button>
         <el-button @click="detailOpen = false">关 闭</el-button>
       </div>
     </el-dialog>
@@ -257,8 +325,7 @@
 </template>
 
 <script>
-// 注意：这里引入了 getTopTags
-import { listDocument, addDocument, delDocument, ocrDocument, getDocument, getTopTags } from "@/api/system/document";
+import { listDocument, addDocument, delDocument, updateDocument, ocrDocument, getDocument, getTopTags } from "@/api/system/document";
 import { getToken } from "@/utils/auth";
 
 export default {
@@ -295,7 +362,7 @@ export default {
       },
       // 表单参数
       form: {
-        tags: [] // 初始化标签
+        tags: [] 
       },
       // 表单校验
       rules: {
@@ -314,16 +381,28 @@ export default {
       fileList: [],
       
       // --- 标签相关数据 ---
-      allUserTags: [], // 所有标签（从后端获取，已排序）
-      showAllTags: false // 是否展开全部标签
+      allUserTags: [], 
+      showAllTags: false,
+
+      // --- 划词菜单相关数据 ---
+      menuVisible: false,
+      menuStyle: {
+        left: '0px',
+        top: '0px'
+      },
+      currentSelection: ''
     };
   },
   created() {
     this.getList();
     this.getTagsList();
+    // 全局点击监听，用于关闭划词菜单 (点击空白处关闭)
+    document.addEventListener('mousedown', this.handleGlobalClick);
+  },
+  destroyed() {
+    document.removeEventListener('mousedown', this.handleGlobalClick);
   },
   computed: {
-    // 计算属性：决定显示哪些快捷标签（前10个 或 全部）
     visibleTags() {
       if (this.showAllTags) {
         return this.allUserTags;
@@ -349,12 +428,10 @@ export default {
         this.loading = false;
       });
     },
-    // 取消按钮
     cancel() {
       this.open = false;
       this.reset();
     },
-    // 表单重置
     reset() {
       this.form = {
         documentId: undefined,
@@ -363,48 +440,35 @@ export default {
         fileOriginName: undefined,
         fileSuffix: undefined,
         remark: undefined,
-        tags: [] // 重置标签
+        tags: [] 
       };
       this.fileList = [];
       this.resetForm("form");
     },
-    /** 搜索按钮操作 */
     handleQuery() {
       this.queryParams.pageNum = 1;
       this.getList();
     },
-    /** 重置按钮操作 */
     resetQuery() {
       this.resetForm("queryForm");
       this.handleQuery();
     },
-    // 多选框选中数据
     handleSelectionChange(selection) {
       this.ids = selection.map(item => item.documentId)
       this.single = selection.length != 1
       this.multiple = !selection.length
     },
-    /** 新增按钮操作 */
     handleAdd() {
       this.reset();
       this.open = true;
       this.title = "上传文档";
-      
-      // 打开弹窗时，获取最新的常用标签
       this.showAllTags = false;
       this.getTagsList();
-      // 调用我们在 API 里新增的接口
-      getTopTags().then(res => {
-        // 假设后端返回 ["TagA", "TagB", ...]
-        this.allUserTags = res.data || [];
-      });
     },
-    /** 点击快捷标签 */
     handleQuickAddTag(tag) {
       if (!this.form.tags) {
         this.$set(this.form, 'tags', []);
       }
-      // 如果已存在则移除，不存在则添加
       const index = this.form.tags.indexOf(tag);
       if (index > -1) {
         this.form.tags.splice(index, 1);
@@ -412,7 +476,6 @@ export default {
         this.form.tags.push(tag);
       }
     },
-    /** 提交按钮 */
     submitForm: function() {
       this.$refs["form"].validate(valid => {
         if (valid) {
@@ -424,7 +487,6 @@ export default {
         }
       });
     },
-    /** 删除按钮操作 */
     handleDelete(row) {
       const documentIds = row.documentId || this.ids;
       this.$modal.confirm('是否确认删除文档ID为"' + documentIds + '"的数据项？').then(function() {
@@ -434,11 +496,9 @@ export default {
         this.$modal.msgSuccess("删除成功");
       }).catch(() => {});
     },
-    /** 下载按钮操作 */
     handleDownload(row) {
       this.$download.resource(row.filePath);
     },
-    /** OCR识别按钮操作 */
     handleOcr(row) {
       const documentId = row.documentId;
       const loading = this.$loading({
@@ -451,21 +511,44 @@ export default {
       ocrDocument(documentId).then(response => {
         loading.close();
         this.$modal.msgSuccess("识别请求已提交（模拟成功）");
-        this.getList(); // 刷新列表查看状态变化
+        this.getList(); 
       }).catch(() => {
         loading.close();
       });
     },
-    /** 查看详情操作 */
     handleDetail(row) {
       this.reset();
       const documentId = row.documentId;
+      this.getTagsList();
+      this.showAllTags = false;
+      this.menuVisible = false; // 重置菜单状态
+
       getDocument(documentId).then(response => {
         this.detailForm = response.data;
+        if (!this.detailForm.tags) {
+          this.$set(this.detailForm, 'tags', []);
+        }
         this.detailOpen = true;
       });
     },
-    // 上传前校验
+    handleQuickAddTagDetail(tag) {
+      if (!this.detailForm.tags) {
+        this.$set(this.detailForm, 'tags', []);
+      }
+      const index = this.detailForm.tags.indexOf(tag);
+      if (index > -1) {
+        this.detailForm.tags.splice(index, 1);
+      } else {
+        this.detailForm.tags.push(tag);
+      }
+    },
+    submitDetailForm() {
+      updateDocument(this.detailForm).then(response => {
+        this.$modal.msgSuccess("修改成功");
+        this.detailOpen = false;
+        this.getList(); 
+      });
+    },
     handleBeforeUpload(file) {
       const isLt50M = file.size / 1024 / 1024 < 50;
       if (!isLt50M) {
@@ -473,7 +556,6 @@ export default {
       }
       return isLt50M;
     },
-    // 上传成功回调
     handleUploadSuccess(res, file) {
       if (res.code === 200) {
         this.form.filePath = res.fileName;
@@ -489,11 +571,103 @@ export default {
         this.$refs.upload.clearFiles();
       }
     },
-    // 移除文件
     handleRemove(file, fileList) {
       this.form.filePath = undefined;
       this.form.fileOriginName = undefined;
       this.form.fileSuffix = undefined;
+    },
+
+    // ================== 新增：划词菜单逻辑 ==================
+    handleGlobalClick(e) {
+      if (e.target.closest('.ocr-context-menu')) {
+        return;
+      }
+      if (e.target.closest('.el-textarea__inner')) {
+        return;
+      }
+      this.menuVisible = false;
+    },
+    closeMenu() {
+      this.menuVisible = false;
+    },
+    handleOcrMouseUp(e) {
+      const selection = window.getSelection();
+      const text = selection.toString().trim();
+
+      if (text && text.length > 0 && text.length < 100) { 
+        this.currentSelection = text;
+        this.menuVisible = true;
+
+        this.menuStyle = {
+          left: (e.clientX + 5) + 'px',
+          top: (e.clientY + 5) + 'px'
+        };
+      } else {
+        this.menuVisible = false;
+      }
+    },
+    
+    // 功能1：添加为标签
+    addSelectionToTags() {
+      if (!this.detailForm.tags) {
+        this.$set(this.detailForm, 'tags', []);
+      }
+      // 去重
+      if (!this.detailForm.tags.includes(this.currentSelection)) {
+        this.detailForm.tags.push(this.currentSelection);
+        this.$message.success(`已添加标签: ${this.currentSelection}`);
+      } else {
+        this.$message.warning("该标签已存在");
+      }
+      this.menuVisible = false;
+      // 清除选中状态
+      window.getSelection().removeAllRanges();
+    },
+
+    // 功能2：替换所有标签
+    replaceTagsWithSelection() {
+      this.$confirm(`确定要清空现有标签，并使用 "${this.currentSelection}" 替换吗？`, "确认", {
+        confirmButtonText: "确定",
+        cancelButtonText: "取消",
+        type: "warning"
+      }).then(() => {
+        this.detailForm.tags = [this.currentSelection];
+        this.$message.success("标签已替换");
+        this.menuVisible = false;
+        window.getSelection().removeAllRanges();
+      });
+    },
+
+    // 功能3：复制文本
+    copySelection() {
+      const text = this.currentSelection;
+      // 尝试使用现代 Clipboard API
+      if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(text).then(() => {
+          this.$message.success("复制成功");
+        }).catch(() => {
+          this.$message.error("复制失败，请手动复制");
+        });
+      } else {
+        // 兼容旧版/非HTTPS环境 (execCommand)
+        const textArea = document.createElement("textarea");
+        textArea.value = text;
+        // 确保元素不可见但存在于DOM中
+        textArea.style.position = "fixed";
+        textArea.style.left = "-9999px";
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        try {
+          document.execCommand('copy');
+          this.$message.success("复制成功");
+        } catch (err) {
+          this.$message.error("复制失败");
+        }
+        document.body.removeChild(textArea);
+      }
+      this.menuVisible = false;
+      window.getSelection().removeAllRanges();
     }
   }
 };
@@ -519,9 +693,43 @@ export default {
 .recommend-tag:hover {
   opacity: 0.8;
 }
-/* 调整按钮样式 */
 .el-button--text {
     padding-bottom: 0;
     padding-top: 0;
+}
+
+/* ================== 新增：划词菜单样式 ================== */
+.ocr-wrapper {
+  position: relative; /* 仅作为容器 */
+}
+
+.ocr-context-menu {
+  position: fixed; /* 使用 fixed 避免被弹窗遮挡 */
+  z-index: 9999;   /* 确保在最顶层，高于 el-dialog */
+  background: #fff;
+  border: 1px solid #ebeef5;
+  box-shadow: 0 2px 12px 0 rgba(0,0,0,.1);
+  border-radius: 4px;
+  padding: 8px 12px;
+  min-width: 260px; /* 稍微加宽以容纳3个按钮 */
+}
+
+.menu-header {
+  font-size: 12px;
+  color: #606266;
+  margin-bottom: 8px;
+  border-bottom: 1px solid #f2f6fc;
+  padding-bottom: 5px;
+  /* 文本溢出显示省略号 */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 300px;
+}
+
+.menu-buttons {
+  display: flex;
+  justify-content: space-between;
+  gap: 5px; /* 按钮间距 */
 }
 </style>
