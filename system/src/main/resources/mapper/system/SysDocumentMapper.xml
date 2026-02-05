@@ -7,6 +7,11 @@
     <resultMap type="SysDocument" id="SysDocumentResult">
         <result property="documentId"    column="document_id"    />
         <result property="documentName"  column="document_name"  />
+        <!-- 新增字段映射 -->
+        <result property="productName"   column="product_name"   />
+        <result property="productModel"  column="product_model"  />
+        <result property="internalCode"  column="internal_code"  />
+        <!-- 原有字段 -->
         <result property="filePath"      column="file_path"      />
         <result property="fileOriginName" column="file_origin_name" />
         <result property="fileSuffix"    column="file_suffix"    />
@@ -22,7 +27,8 @@
     </resultMap>
 
     <sql id="selectDocumentVo">
-        select document_id, document_name, file_path, file_origin_name, file_suffix, create_by, create_time, remark, is_recognized, ocr_content, ocr_time, ocr_error from sys_document
+        select document_id, document_name, product_name, product_model, internal_code, file_path, file_origin_name, file_suffix, create_by, create_time, remark, is_recognized, ocr_content, ocr_time, ocr_error, status
+        from sys_document
     </sql>
 
     <select id="selectDocumentList" parameterType="SysDocument" resultMap="SysDocumentResult">
@@ -53,6 +59,11 @@
         update sys_document
         <trim prefix="SET" suffixOverrides=",">
             <if test="documentName != null">document_name = #{documentName},</if>
+            <!-- 新增更新字段 -->
+            <if test="productName != null">product_name = #{productName},</if>
+            <if test="productModel != null">product_model = #{productModel},</if>
+            <if test="internalCode != null">internal_code = #{internalCode},</if>
+            <!-- 原有字段 -->
             <if test="filePath != null">file_path = #{filePath},</if>
             <if test="fileOriginName != null">file_origin_name = #{fileOriginName},</if>
             <if test="fileSuffix != null">file_suffix = #{fileSuffix},</if>
@@ -71,6 +82,11 @@
         insert into sys_document
         <trim prefix="(" suffix=")" suffixOverrides=",">
             <if test="documentName != null">document_name,</if>
+            <!-- 新增插入字段 -->
+            <if test="productName != null">product_name,</if>
+            <if test="productModel != null">product_model,</if>
+            <if test="internalCode != null">internal_code,</if>
+            <!-- 原有字段 -->
             <if test="filePath != null">file_path,</if>
             <if test="fileOriginName != null">file_origin_name,</if>
             <if test="fileSuffix != null">file_suffix,</if>
@@ -80,6 +96,11 @@
         </trim>
         <trim prefix="values (" suffix=")" suffixOverrides=",">
             <if test="documentName != null">#{documentName},</if>
+            <!-- 新增插入值 -->
+            <if test="productName != null">#{productName},</if>
+            <if test="productModel != null">#{productModel},</if>
+            <if test="internalCode != null">#{internalCode},</if>
+            <!-- 原有值 -->
             <if test="filePath != null">#{filePath},</if>
             <if test="fileOriginName != null">#{fileOriginName},</if>
             <if test="fileSuffix != null">#{fileSuffix},</if>

@@ -60,6 +60,12 @@ CREATE TABLE `sys_document` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='文档管理表' ROW_FORMAT=DYNAMIC;
 
 
+ALTER TABLE `sys_document`
+    ADD COLUMN `product_name` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT '' COMMENT '产品名称' AFTER `document_name`,
+ADD COLUMN `product_model` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT '' COMMENT '产品型号' AFTER `product_name`,
+ADD COLUMN `internal_code` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NULL DEFAULT '' COMMENT '内部编号' AFTER `product_model`;
+
+
 #标签表
 DROP TABLE IF EXISTS `sys_tag`;
 CREATE TABLE `sys_tag` (

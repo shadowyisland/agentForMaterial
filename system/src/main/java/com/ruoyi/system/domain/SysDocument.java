@@ -14,167 +14,160 @@ import com.ruoyi.common.core.domain.BaseEntity;
 public class SysDocument extends BaseEntity {
     private static final long serialVersionUID = 1L;
 
-    /**
-     * 文档ID
-     */
+    /** 文档ID */
     private Long documentId;
 
-    /**
-     * 文档名称
-     */
+    /** 文档名称 */
     @Excel(name = "文档名称")
     private String documentName;
 
-    /**
-     * 文件路径
-     */
+    /** 产品名称 */
+    @Excel(name = "产品名称")
+    private String productName;
+
+    /** 产品型号 */
+    @Excel(name = "产品型号")
+    private String productModel;
+
+    /** 内部编号 */
+    @Excel(name = "内部编号")
+    private String internalCode;
+
+    /** 文件路径 */
     @Excel(name = "文件路径")
     private String filePath;
 
-    /**
-     * 原文件名
-     */
+    /** 原文件名 */
     @Excel(name = "原文件名")
     private String fileOriginName;
 
-    /**
-     * 文件后缀
-     */
+    /** 文件后缀 */
     @Excel(name = "文件后缀")
     private String fileSuffix;
 
-    /**
-     * 文件大小
-     */
+    /** 文件大小 */
     @Excel(name = "文件大小")
     private Long fileSize;
 
-    /**
-     * MIME类型
-     */
+    /** MIME类型 */
     @Excel(name = "MIME类型")
     private String mimeType;
 
-    /**
-     * OCR识别内容
-     */
+    /** OCR识别内容 */
     private String ocrContent;
 
-    /**
-     * OCR是否完成
-     */
+    /** OCR是否完成 */
     private Integer isRecognized;
 
-    /**
-     * OCR完成时间
-     */
+    /** OCR完成时间 */
     private Date ocrTime;
 
-    /**
-     * OCR失败原因
-     */
+    /** OCR失败原因 */
     private String ocrError;
 
-    /**
-     * 状态
-     */
+    /** 状态 */
     @Excel(name = "状态")
     private String status;
+
     private String searchTag;
 
-    // --- 新增代码 Start ---
-    /**
-     * 标签列表（非数据库字段，用于接收前端传参）
-     */
+    /** 标签列表（非数据库字段，用于接收前端传参） */
     private List<String> tags;
-
-    public List<String> getTags() {
-        return tags;
-    }
-
-    public void setTags(List<String> tags) {
-        this.tags = tags;
-    }
-    // --- 新增代码 End ---
-
-    public void setDocumentId(Long documentId) {
-        this.documentId = documentId;
-    }
 
     public Long getDocumentId() {
         return documentId;
     }
 
-    public void setDocumentName(String documentName) {
-        this.documentName = documentName;
+    public void setDocumentId(Long documentId) {
+        this.documentId = documentId;
     }
 
     public String getDocumentName() {
         return documentName;
     }
 
-    public void setFilePath(String filePath) {
-        this.filePath = filePath;
+    public void setDocumentName(String documentName) {
+        this.documentName = documentName;
+    }
+
+    public String getProductName() {
+        return productName;
+    }
+
+    public void setProductName(String productName) {
+        this.productName = productName;
+    }
+
+    public String getProductModel() {
+        return productModel;
+    }
+
+    public void setProductModel(String productModel) {
+        this.productModel = productModel;
+    }
+
+    public String getInternalCode() {
+        return internalCode;
+    }
+
+    public void setInternalCode(String internalCode) {
+        this.internalCode = internalCode;
     }
 
     public String getFilePath() {
         return filePath;
     }
 
-    public void setFileOriginName(String fileOriginName) {
-        this.fileOriginName = fileOriginName;
+    public void setFilePath(String filePath) {
+        this.filePath = filePath;
     }
 
     public String getFileOriginName() {
         return fileOriginName;
     }
 
-    public void setFileSuffix(String fileSuffix) {
-        this.fileSuffix = fileSuffix;
+    public void setFileOriginName(String fileOriginName) {
+        this.fileOriginName = fileOriginName;
     }
 
     public String getFileSuffix() {
         return fileSuffix;
     }
 
-    public void setFileSize(Long fileSize) {
-        this.fileSize = fileSize;
+    public void setFileSuffix(String fileSuffix) {
+        this.fileSuffix = fileSuffix;
     }
 
     public Long getFileSize() {
         return fileSize;
     }
 
-    public void setMimeType(String mimeType) {
-        this.mimeType = mimeType;
+    public void setFileSize(Long fileSize) {
+        this.fileSize = fileSize;
     }
 
     public String getMimeType() {
         return mimeType;
     }
 
-    public void setOcrContent(String ocrContent) {
-        this.ocrContent = ocrContent;
+    public void setMimeType(String mimeType) {
+        this.mimeType = mimeType;
     }
 
     public String getOcrContent() {
         return ocrContent;
     }
 
-    public void setIsRecognized(Integer isRecognized) {
-        this.isRecognized = isRecognized;
+    public void setOcrContent(String ocrContent) {
+        this.ocrContent = ocrContent;
     }
 
     public Integer getIsRecognized() {
         return isRecognized;
     }
 
-    public void setStatus(String status) {
-        this.status = status;
-    }
-
-    public String getStatus() {
-        return status;
+    public void setIsRecognized(Integer isRecognized) {
+        this.isRecognized = isRecognized;
     }
 
     public Date getOcrTime() {
@@ -193,6 +186,14 @@ public class SysDocument extends BaseEntity {
         this.ocrError = ocrError;
     }
 
+    public String getStatus() {
+        return status;
+    }
+
+    public void setStatus(String status) {
+        this.status = status;
+    }
+
     public String getSearchTag() {
         return searchTag;
     }
@@ -201,11 +202,22 @@ public class SysDocument extends BaseEntity {
         this.searchTag = searchTag;
     }
 
+    public List<String> getTags() {
+        return tags;
+    }
+
+    public void setTags(List<String> tags) {
+        this.tags = tags;
+    }
+
     @Override
     public String toString() {
         return new ToStringBuilder(this, ToStringStyle.MULTI_LINE_STYLE)
                 .append("documentId", getDocumentId())
                 .append("documentName", getDocumentName())
+                .append("productName", getProductName())
+                .append("productModel", getProductModel())
+                .append("internalCode", getInternalCode())
                 .append("filePath", getFilePath())
                 .append("fileOriginName", getFileOriginName())
                 .append("fileSuffix", getFileSuffix())

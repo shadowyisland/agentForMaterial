@@ -73,6 +73,10 @@
             </template>
           </el-table-column>
 
+          <el-table-column label="产品名称" align="center" prop="productName" />
+          <el-table-column label="产品型号" align="center" prop="productModel" />
+          <el-table-column label="内部编号" align="center" prop="internalCode" />
+
           <el-table-column label="OCR状态" align="center" prop="isRecognized">
             <template slot-scope="scope">
               <el-tag v-if="scope.row.isRecognized === 1" type="success">已识别</el-tag>
@@ -82,7 +86,7 @@
 
           <el-table-column label="原始文件名" align="center" prop="fileOriginName" :show-overflow-tooltip="true" />
           <el-table-column label="上传人" align="center" prop="createBy" />
-          
+
           <el-table-column label="文件标签" align="center" prop="tags" width="200">
             <template slot-scope="scope">
               <div v-if="scope.row.tags && scope.row.tags.length > 0">
@@ -222,10 +226,10 @@
       </div>
     </el-dialog>
 
-    <el-dialog 
-      title="OCR识别详情与标签管理" 
-      :visible.sync="detailOpen" 
-      width="700px" 
+    <el-dialog
+      title="OCR识别详情与标签管理"
+      :visible.sync="detailOpen"
+      width="700px"
       append-to-body
       @close="closeMenu"
     >
@@ -255,7 +259,7 @@
                   :value="item"
                 />
               </el-select>
-              
+
               <div class="tag-recommend-area" v-if="allUserTags && allUserTags.length > 0">
                 <span class="tag-title">推荐：</span>
                 <el-tag
@@ -283,7 +287,7 @@
           <el-col :span="12">
             <el-form-item label="识别时间：">{{ parseTime(detailForm.ocrTime) }}</el-form-item>
           </el-col>
-          
+
           <el-col :span="24">
             <el-form-item label="识别结果：">
               <div class="ocr-wrapper">
@@ -294,11 +298,11 @@
                   placeholder="暂无识别内容，可手动编辑。尝试选中文字可快速打标签。"
                   @mouseup.native="handleOcrMouseUp"
                 />
-                
+
                 <transition name="el-zoom-in-top">
-                  <div 
-                    v-show="menuVisible" 
-                    class="ocr-context-menu" 
+                  <div
+                    v-show="menuVisible"
+                    class="ocr-context-menu"
                     :style="menuStyle"
                     @mousedown.stop
                   >
@@ -362,7 +366,7 @@ export default {
       },
       // 表单参数
       form: {
-        tags: [] 
+        tags: []
       },
       // 表单校验
       rules: {
@@ -381,7 +385,7 @@ export default {
       fileList: [],
 
       // --- 标签相关数据 ---
-      allUserTags: [], 
+      allUserTags: [],
       showAllTags: false,
 
       // --- 划词菜单相关数据 ---
@@ -440,7 +444,7 @@ export default {
         fileOriginName: undefined,
         fileSuffix: undefined,
         remark: undefined,
-        tags: [] 
+        tags: []
       };
       this.fileList = [];
       this.resetForm("form");
@@ -511,7 +515,7 @@ export default {
       ocrDocument(documentId).then(response => {
         loading.close();
         this.$modal.msgSuccess("识别请求已提交（模拟成功）");
-        this.getList(); 
+        this.getList();
       }).catch(() => {
         loading.close();
       });
@@ -546,7 +550,7 @@ export default {
       updateDocument(this.detailForm).then(response => {
         this.$modal.msgSuccess("修改成功");
         this.detailOpen = false;
-        this.getList(); 
+        this.getList();
       });
     },
     handleBeforeUpload(file) {
@@ -594,7 +598,7 @@ export default {
       const selection = window.getSelection();
       const text = selection.toString().trim();
 
-      if (text && text.length > 0 && text.length < 100) { 
+      if (text && text.length > 0 && text.length < 100) {
         this.currentSelection = text;
         this.menuVisible = true;
 
@@ -606,7 +610,7 @@ export default {
         this.menuVisible = false;
       }
     },
-    
+
     // 功能1：添加为标签
     addSelectionToTags() {
       if (!this.detailForm.tags) {
