@@ -165,6 +165,30 @@ public class CommonController
     }
 
     /**
+     * 删除OSS文件
+     * 传入完整的URL，例如：https://kkmaterial1.oss-cn-shanghai.aliyuncs.com/2026-01-19/xxx.png
+     */
+    @DeleteMapping("/remove/oss")
+    public AjaxResult removeOssFile(@RequestParam String url)
+    {
+        if (StringUtils.isEmpty(url))
+        {
+            return AjaxResult.error("URL不能为空");
+        }
+        try
+        {
+            // 调用Service层处理删除逻辑
+            boolean result = ossService.deleteOssFileByUrl(url);
+            return result ? AjaxResult.success() : AjaxResult.error("删除失败");
+        }
+        catch (Exception e)
+        {
+            return AjaxResult.error("删除失败: " + e.getMessage());
+        }
+    }
+
+
+    /**
      * 本地资源通用下载
      */
     @GetMapping("/download/resource")
