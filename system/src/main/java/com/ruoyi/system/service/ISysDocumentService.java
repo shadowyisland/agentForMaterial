@@ -46,4 +46,24 @@ public interface ISysDocumentService
      * @return 结果
      */
     public int ocrDocument(Long documentId);
+
+    /**
+     * 给文档新增标签
+     *
+     * @param documentId 文档ID
+     * @param tagName 标签名称
+     * @param userId 用户ID
+     * @return 结果
+     */
+    int addDocumentTag(Long documentId, String tagName, Long userId);
+
+    /**
+     * 替换文档的标签
+     *
+     * @param documentId 文档ID
+     * @param tagName 标签名称
+     * @param userId 用户ID
+     * @return 结果
+     */
+    int replaceDocumentTag(Long documentId, String tagName, Long userId);
 }

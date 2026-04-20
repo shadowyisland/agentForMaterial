@@ -48,4 +48,28 @@
         DELETE FROM sys_document_tag WHERE document_id = #{documentId}
     </delete>
 
+    <select id="selectTagByNameAndUserId" resultType="SysTag">
+        select tag_id as tagId, owner_user_id as ownerUserId, tag_name as tagName, tag_key as tagKey
+        from sys_tag
+        where owner_user_id = #{userId}
+          and tag_name = #{tagName}
+          and del_flag = '0'
+            limit 1
+    </select>
+
+
+    <select id="checkDocumentTag" resultType="int">
+        select count(1) from sys_document_tag
+        where document_id = #{documentId} and tag_id = #{tagId}
+    </select>
+
+    <insert id="insertDocumentTag">
+        insert into sys_document_tag(document_id, tag_id, create_time)
+        values(#{documentId}, #{tagId}, #{createTime})
+    </insert>
+
+    <delete id="deleteDocumentTagByDocumentId">
+        delete from sys_document_tag where document_id = #{documentId}
+    </delete>
+
 </mapper>

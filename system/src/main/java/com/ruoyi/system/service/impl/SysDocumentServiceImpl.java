@@ -26,6 +26,11 @@ import com.ruoyi.system.domain.SysTag;
 import com.ruoyi.system.mapper.SysDocumentMapper;
 import com.ruoyi.system.mapper.SysTagMapper;
 import com.ruoyi.system.service.ISysDocumentService;
+import org.springframework.transaction.annotation.Transactional;
+import com.ruoyi.common.utils.DateUtils;
+import com.ruoyi.common.utils.SecurityUtils;
+import com.ruoyi.system.domain.SysTag;
+import com.ruoyi.system.mapper.SysTagMapper;
 
 /**
  * 文档管理Service业务层处理
@@ -51,6 +56,52 @@ public class SysDocumentServiceImpl implements ISysDocumentService {
     @Override
     public List<SysDocument> selectDocumentList(SysDocument document) {
         return documentMapper.selectDocumentList(document);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public int addDocumentTag(Long documentId, String tagName, Long userId) {
+        // 1. 获取或创建标签
+        Long tagId = getOrCreateTag(tagName, userId);
+
+        // 2. 检查是否已经关联过该标签，避免重复插入报错
+        int count = sysTagMapper.checkDocumentTag(documentId, tagId);
+        if (count == 0) {
+            // 3. 建立文档和标签的关联
+            return sysTagMapper.insertDocumentTag(documentId, tagId, DateUtils.getNowDate());
+        }
+        return 1;
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public int replaceDocumentTag(Long documentId, String tagName, Long userId) {
+        // 1. 删除该文档原有的所有标签关联
+        sysTagMapper.deleteDocumentTagByDocumentId(documentId);
+
+        // 2. 获取或创建新标签
+        Long tagId = getOrCreateTag(tagName, userId);
+
+        // 3. 建立新关联
+        return sysTagMapper.insertDocumentTag(documentId, tagId, DateUtils.getNowDate());
+    }
+
+    /**
+     * 内部方法：获取已有标签，不存在则创建
+     */
+    private Long getOrCreateTag(String tagName, Long userId) {
+        // 查询该用户下是否已有同名标签
+        SysTag tag = sysTagMapper.selectTagByNameAndUserId(tagName, userId);
+        if (tag == null) {
+            tag = new SysTag();
+            tag.setTagName(tagName);
+            tag.setOwnerUserId(userId);
+            tag.setCreateBy(SecurityUtils.getUsername());
+            tag.setCreateTime(DateUtils.getNowDate());
+            // 插入标签，MyBatis的 useGeneratedKeys 会将生成的 tag_id 回填到对象中
+            sysTagMapper.insertTag(tag);
+        }
+        return tag.getTagId();
     }
 
     /**

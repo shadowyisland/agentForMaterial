@@ -1,5 +1,9 @@
 package com.ruoyi.web.controller.system;
 
+// 请在文件头部补充导入 DTO
+import com.ruoyi.system.domain.dto.DocumentTagDto;
+// 补充 StringUtils 的导入
+import com.ruoyi.common.utils.StringUtils;
 import java.util.List;
 import javax.servlet.http.HttpServletResponse;
 import com.ruoyi.system.mapper.SysTagMapper;
@@ -125,5 +129,33 @@ public class SysDocumentController extends BaseController
     public AjaxResult remove(@PathVariable Long[] documentIds)
     {
         return toAjax(sysDocumentService.deleteDocumentByIds(documentIds));
+    }
+
+    /**
+     * OCR选中文本：新增标签
+     */
+    @PreAuthorize("@ss.hasPermi('system:document:edit')")
+    @Log(title = "文档管理-新增标签", businessType = BusinessType.INSERT)
+    @PostMapping("/addTag")
+    public AjaxResult addTag(@RequestBody DocumentTagDto dto)
+    {
+        if (dto.getDocumentId() == null || StringUtils.isEmpty(dto.getTagName())) {
+            return AjaxResult.error("参数不完整：文档ID或标签内容不能为空");
+        }
+        return toAjax(sysDocumentService.addDocumentTag(dto.getDocumentId(), dto.getTagName(), getUserId()));
+    }
+
+    /**
+     * OCR选中文本：替换标签 (清空当前文档旧标签，设置新标签)
+     */
+    @PreAuthorize("@ss.hasPermi('system:document:edit')")
+    @Log(title = "文档管理-替换标签", businessType = BusinessType.UPDATE)
+    @PostMapping("/replaceTag")
+    public AjaxResult replaceTag(@RequestBody DocumentTagDto dto)
+    {
+        if (dto.getDocumentId() == null || StringUtils.isEmpty(dto.getTagName())) {
+            return AjaxResult.error("参数不完整：文档ID或标签内容不能为空");
+        }
+        return toAjax(sysDocumentService.replaceDocumentTag(dto.getDocumentId(), dto.getTagName(), getUserId()));
     }
 }

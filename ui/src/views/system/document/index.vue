@@ -73,10 +73,6 @@
             </template>
           </el-table-column>
 
-          <el-table-column label="产品名称" align="center" prop="productName" />
-          <el-table-column label="产品型号" align="center" prop="productModel" />
-          <el-table-column label="内部编号" align="center" prop="internalCode" />
-
           <el-table-column label="OCR状态" align="center" prop="isRecognized">
             <template slot-scope="scope">
               <el-tag v-if="scope.row.isRecognized === 1" type="success">已识别</el-tag>
