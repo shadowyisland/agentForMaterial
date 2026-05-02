@@ -23,6 +23,7 @@ import com.ruoyi.framework.web.service.SysPermissionService;
 import com.ruoyi.framework.web.service.TokenService;
 import com.ruoyi.system.service.ISysConfigService;
 import com.ruoyi.system.service.ISysMenuService;
+import com.ruoyi.system.service.ISysTagMenuService;
 
 /**
  * 登录验证
@@ -37,6 +38,9 @@ public class SysLoginController
 
     @Autowired
     private ISysMenuService menuService;
+
+    @Autowired
+    private ISysTagMenuService tagMenuService;
 
     @Autowired
     private SysPermissionService permissionService;
@@ -101,6 +105,7 @@ public class SysLoginController
     public AjaxResult getRouters()
     {
         Long userId = SecurityUtils.getUserId();
+        tagMenuService.syncTagMenus();
         List<SysMenu> menus = menuService.selectMenuTreeByUserId(userId);
         return AjaxResult.success(menuService.buildMenus(menus));
     }

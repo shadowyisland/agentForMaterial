@@ -12,7 +12,7 @@
               @keyup.enter.native="handleQuery"
             />
           </el-form-item>
-          <el-form-item label="标签筛选" prop="searchTag">
+          <el-form-item v-if="!isReadonlyPage" label="标签筛选" prop="searchTag">
             <el-select
               v-model="queryParams.searchTag"
               placeholder="选择或输入标签"
@@ -35,7 +35,7 @@
           </el-form-item>
         </el-form>
 
-        <el-row :gutter="10" class="mb8">
+        <el-row v-if="!isReadonlyPage" :gutter="10" class="mb8">
           <el-col :span="1.5">
             <el-button
               type="primary"
@@ -61,7 +61,7 @@
         </el-row>
 
         <el-table v-loading="loading" :data="documentList" @selection-change="handleSelectionChange">
-          <el-table-column type="selection" width="50" align="center" />
+          <el-table-column v-if="!isReadonlyPage" type="selection" width="50" align="center" />
           <el-table-column label="文档ID" align="center" prop="documentId" />
 
           <el-table-column label="文档名称" align="center" prop="documentName" :show-overflow-tooltip="true">
@@ -72,6 +72,9 @@
               >{{ scope.row.documentName }}</span>
             </template>
           </el-table-column>
+          <el-table-column label="产品名称" align="center" prop="productName" :show-overflow-tooltip="true" />
+          <el-table-column label="产品型号" align="center" prop="productModel" :show-overflow-tooltip="true" />
+          <el-table-column label="内部编号" align="center" prop="internalCode" :show-overflow-tooltip="true" />
 
           <el-table-column label="OCR状态" align="center" prop="isRecognized">
             <template slot-scope="scope">
@@ -104,7 +107,7 @@
               <span>{{ parseTime(scope.row.createTime) }}</span>
             </template>
           </el-table-column>
-          <el-table-column label="操作" align="center" class-name="small-padding fixed-width">
+          <el-table-column v-if="!isReadonlyPage" label="操作" align="center" class-name="small-padding fixed-width">
             <template slot-scope="scope">
               <el-button
                 size="mini"
@@ -166,6 +169,19 @@
             <div class="el-upload__tip" slot="tip">支持 PDF/JPG/PNG，且不超过50MB</div>
           </el-upload>
         </el-form-item>
+        <el-form-item label="产品名称" prop="productName">
+          <el-input v-model="form.productName" placeholder="请输入产品名称" />
+        </el-form-item>
+
+        <el-form-item label="产品型号" prop="productModel">
+          <el-input v-model="form.productModel" placeholder="请输入产品型号" />
+        </el-form-item>
+
+        <el-form-item label="内部编号" prop="internalCode">
+          <el-input v-model="form.internalCode" placeholder="请输入内部编号" />
+        </el-form-item>
+
+
 
         <el-form-item label="文档标签" prop="tags">
           <el-select
@@ -233,7 +249,7 @@
         <el-row>
           <el-col :span="24">
             <el-form-item label="文档名称：">
-              <el-input v-model="detailForm.documentName" />
+              <el-input v-model="detailForm.documentName" :readonly="isReadonlyPage" />
             </el-form-item>
           </el-col>
 
@@ -245,6 +261,7 @@
                 filterable
                 allow-create
                 default-first-option
+                :disabled="isReadonlyPage"
                 placeholder="请选择或输入标签"
                 style="width: 100%"
               >
@@ -256,7 +273,7 @@
                 />
               </el-select>
 
-              <div class="tag-recommend-area" v-if="allUserTags && allUserTags.length > 0">
+              <div class="tag-recommend-area" v-if="!isReadonlyPage && allUserTags && allUserTags.length > 0">
                 <span class="tag-title">推荐：</span>
                 <el-tag
                   v-for="tag in visibleTags"
@@ -291,8 +308,9 @@
                   type="textarea"
                   :rows="15"
                   v-model="detailForm.ocrContent"
+                  :readonly="isReadonlyPage"
                   placeholder="暂无识别内容，可手动编辑。尝试选中文字可快速打标签。"
-                  @mouseup.native="handleOcrMouseUp"
+                  @mouseup.native="!isReadonlyPage && handleOcrMouseUp($event)"
                 />
 
                 <transition name="el-zoom-in-top">
@@ -316,7 +334,7 @@
         </el-row>
       </el-form>
       <div slot="footer" class="dialog-footer">
-        <el-button type="primary" @click="submitDetailForm">保存修改</el-button>
+        <el-button v-if="!isReadonlyPage" type="primary" @click="submitDetailForm">保存修改</el-button>
         <el-button @click="detailOpen = false">关 闭</el-button>
       </div>
     </el-dialog>
@@ -358,7 +376,9 @@ export default {
       queryParams: {
         pageNum: 1,
         pageSize: 10,
-        documentName: undefined
+        documentName: undefined,
+        searchTag: undefined,
+        exactTag: undefined
       },
       // 表单参数
       form: {
@@ -394,6 +414,7 @@ export default {
     };
   },
   created() {
+    this.applyRouteQuery();
     this.getList();
     this.getTagsList();
     // 全局点击监听，用于关闭划词菜单 (点击空白处关闭)
@@ -403,6 +424,9 @@ export default {
     document.removeEventListener('mousedown', this.handleGlobalClick);
   },
   computed: {
+    isReadonlyPage() {
+      return this.$route.query && this.$route.query.readonly === '1';
+    },
     visibleTags() {
       if (this.showAllTags) {
         return this.allUserTags;
@@ -411,7 +435,28 @@ export default {
       }
     }
   },
+  watch: {
+    '$route.query': {
+      handler() {
+        this.applyRouteQuery();
+        this.getList();
+      },
+      deep: true
+    }
+  },
   methods: {
+    applyRouteQuery() {
+      const exactTag = this.$route.query ? this.$route.query.exactTag : undefined;
+      if (exactTag) {
+        this.queryParams.exactTag = exactTag;
+        this.queryParams.searchTag = undefined;
+      } else {
+        this.queryParams.exactTag = undefined;
+      }
+    },
+    refreshRoutes() {
+      this.$store.dispatch('GenerateRoutes', true);
+    },
     /** 获取所有标签列表 */
     getTagsList() {
       getTopTags().then(res => {
@@ -446,11 +491,15 @@ export default {
       this.resetForm("form");
     },
     handleQuery() {
+      this.applyRouteQuery();
       this.queryParams.pageNum = 1;
       this.getList();
     },
     resetQuery() {
       this.resetForm("queryForm");
+      this.queryParams.documentName = undefined;
+      this.queryParams.searchTag = undefined;
+      this.applyRouteQuery();
       this.handleQuery();
     },
     handleSelectionChange(selection) {
@@ -459,6 +508,9 @@ export default {
       this.multiple = !selection.length
     },
     handleAdd() {
+      if (this.isReadonlyPage) {
+        return;
+      }
       this.reset();
       this.open = true;
       this.title = "上传文档";
@@ -477,22 +529,32 @@ export default {
       }
     },
     submitForm: function() {
+      if (this.isReadonlyPage) {
+        return;
+      }
       this.$refs["form"].validate(valid => {
         if (valid) {
           addDocument(this.form).then(response => {
             this.$modal.msgSuccess("上传成功");
             this.open = false;
             this.getList();
+            this.getTagsList();
+            this.refreshRoutes();
           });
         }
       });
     },
     handleDelete(row) {
+      if (this.isReadonlyPage) {
+        return;
+      }
       const documentIds = row.documentId || this.ids;
       this.$modal.confirm('是否确认删除文档ID为"' + documentIds + '"的数据项？').then(function() {
         return delDocument(documentIds);
       }).then(() => {
         this.getList();
+        this.getTagsList();
+        this.refreshRoutes();
         this.$modal.msgSuccess("删除成功");
       }).catch(() => {});
     },
@@ -500,6 +562,9 @@ export default {
       this.$download.resource(row.filePath);
     },
     handleOcr(row) {
+      if (this.isReadonlyPage) {
+        return;
+      }
       const documentId = row.documentId;
       const loading = this.$loading({
         lock: true,
@@ -532,6 +597,9 @@ export default {
       });
     },
     handleQuickAddTagDetail(tag) {
+      if (this.isReadonlyPage) {
+        return;
+      }
       if (!this.detailForm.tags) {
         this.$set(this.detailForm, 'tags', []);
       }
@@ -543,13 +611,21 @@ export default {
       }
     },
     submitDetailForm() {
+      if (this.isReadonlyPage) {
+        return;
+      }
       updateDocument(this.detailForm).then(response => {
         this.$modal.msgSuccess("修改成功");
         this.detailOpen = false;
         this.getList();
+        this.getTagsList();
+        this.refreshRoutes();
       });
     },
     handleBeforeUpload(file) {
+      if (this.isReadonlyPage) {
+        return false;
+      }
       const isLt50M = file.size / 1024 / 1024 < 50;
       if (!isLt50M) {
         this.$message.error("上传文件大小不能超过 50MB!");
@@ -591,6 +667,9 @@ export default {
       this.menuVisible = false;
     },
     handleOcrMouseUp(e) {
+      if (this.isReadonlyPage) {
+        return;
+      }
       const selection = window.getSelection();
       const text = selection.toString().trim();
 
@@ -609,6 +688,9 @@ export default {
 
     // 功能1：添加为标签
     addSelectionToTags() {
+      if (this.isReadonlyPage) {
+        return;
+      }
       if (!this.detailForm.tags) {
         this.$set(this.detailForm, 'tags', []);
       }
@@ -626,6 +708,9 @@ export default {
 
     // 功能2：替换所有标签
     replaceTagsWithSelection() {
+      if (this.isReadonlyPage) {
+        return;
+      }
       this.$confirm(`确定要清空现有标签，并使用 "${this.currentSelection}" 替换吗？`, "确认", {
         confirmButtonText: "确定",
         cancelButtonText: "取消",

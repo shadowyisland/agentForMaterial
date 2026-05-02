@@ -83,6 +83,31 @@ public interface SysMenuMapper
     public SysMenu selectMenuById(Long menuId);
 
     /**
+     * 查询文档管理目录
+     */
+    public SysMenu selectDocumentMenuDirectory();
+
+    /**
+     * 查询原材料管理菜单
+     */
+    public SysMenu selectMaterialDocumentMenu(Long parentId);
+
+    /**
+     * 根据路由查询自动标签菜单
+     */
+    public SysMenu selectAutoTagMenuByPath(String path);
+
+    /**
+     * 删除全部自动标签菜单
+     */
+    public int deleteAllAutoTagMenus();
+
+    /**
+     * 删除不再使用的自动标签菜单
+     */
+    public int deleteAutoTagMenusNotInPaths(@Param("paths") List<String> paths);
+
+    /**
      * 是否存在菜单子节点
      *
      * @param menuId 菜单ID

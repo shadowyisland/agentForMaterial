@@ -40,12 +40,33 @@
         ORDER BY COUNT(dt.document_id) DESC
     </select>
 
+    <select id="selectUsedDocumentTags" resultMap="SysTagResult">
+        SELECT MIN(t.tag_id) AS tag_id,
+               MIN(t.owner_user_id) AS owner_user_id,
+               t.tag_name,
+               MIN(t.tag_key) AS tag_key
+        FROM sys_tag t
+                 INNER JOIN sys_document_tag dt ON t.tag_id = dt.tag_id
+                 INNER JOIN sys_document d ON dt.document_id = d.document_id
+        WHERE t.del_flag = '0'
+          AND d.del_flag = '0'
+        GROUP BY t.tag_name
+        ORDER BY MIN(t.tag_id)
+    </select>
+
     <insert id="insertDocTag">
         INSERT INTO sys_document_tag(document_id, tag_id) VALUES (#{documentId}, #{tagId})
     </insert>
 
     <delete id="deleteDocTagByDocId" parameterType="Long">
         DELETE FROM sys_document_tag WHERE document_id = #{documentId}
+    </delete>
+
+    <delete id="deleteDocTagByDocIds" parameterType="Long">
+        DELETE FROM sys_document_tag WHERE document_id in
+        <foreach item="documentId" collection="array" open="(" separator="," close=")">
+            #{documentId}
+        </foreach>
     </delete>
 
     <select id="selectTagByNameAndUserId" resultType="SysTag">

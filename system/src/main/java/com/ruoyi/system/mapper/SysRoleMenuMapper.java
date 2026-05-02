@@ -2,6 +2,7 @@ package com.ruoyi.system.mapper;
 
 import java.util.List;
 import com.ruoyi.system.domain.SysRoleMenu;
+import org.apache.ibatis.annotations.Param;
 
 /**
  * 角色与菜单关联表 数据层
@@ -27,6 +28,11 @@ public interface SysRoleMenuMapper
     public int deleteRoleMenuByRoleId(Long roleId);
 
     /**
+     * 通过菜单ID删除角色和菜单关联
+     */
+    public int deleteRoleMenuByMenuId(Long menuId);
+
+    /**
      * 批量删除角色菜单关联信息
      * 
      * @param ids 需要删除的数据ID
@@ -41,4 +47,19 @@ public interface SysRoleMenuMapper
      * @return 结果
      */
     public int batchRoleMenu(List<SysRoleMenu> roleMenuList);
+
+    /**
+     * 复制已有菜单的角色授权到新菜单
+     */
+    public int copyRoleMenuBySourceMenu(@Param("sourceMenuId") Long sourceMenuId, @Param("targetMenuId") Long targetMenuId);
+
+    /**
+     * 删除全部自动标签菜单的角色授权
+     */
+    public int deleteRoleMenuByAllAutoTagMenus();
+
+    /**
+     * 删除不再使用的自动标签菜单角色授权
+     */
+    public int deleteRoleMenuByAutoTagMenusNotInPaths(List<String> paths);
 }

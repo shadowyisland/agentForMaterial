@@ -1,11 +1,9 @@
 package com.ruoyi.system.mapper;
 
+import java.util.Date;
 import java.util.List;
 import com.ruoyi.system.domain.SysTag;
 import org.apache.ibatis.annotations.Param;
-import org.apache.ibatis.annotations.Param;
-import java.util.Date;
-import com.ruoyi.system.domain.SysTag;
 
 /**
  * 标签Mapper接口
@@ -28,6 +26,11 @@ public interface SysTagMapper
     public List<String> selectTagsByUserId(Long userId);
 
     /**
+     * 获取已有文档关联的标签
+     */
+    public List<SysTag> selectUsedDocumentTags();
+
+    /**
      * 关联文档和标签
      */
     public int insertDocTag(@Param("documentId") Long documentId, @Param("tagId") Long tagId);
@@ -36,6 +39,11 @@ public interface SysTagMapper
      * 根据文档ID删除标签关联
      */
     public int deleteDocTagByDocId(Long documentId);
+
+    /**
+     * 根据文档ID批量删除标签关联
+     */
+    public int deleteDocTagByDocIds(Long[] documentIds);
 
     /** 查询用户私有同名标签 */
     SysTag selectTagByNameAndUserId(@Param("tagName") String tagName, @Param("userId") Long userId);

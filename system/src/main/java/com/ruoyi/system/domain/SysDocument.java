@@ -71,6 +71,8 @@ public class SysDocument extends BaseEntity {
 
     private String searchTag;
 
+    private String exactTag;
+
     /** 标签列表（非数据库字段，用于接收前端传参） */
     private List<String> tags;
 
@@ -202,6 +204,14 @@ public class SysDocument extends BaseEntity {
         this.searchTag = searchTag;
     }
 
+    public String getExactTag() {
+        return exactTag;
+    }
+
+    public void setExactTag(String exactTag) {
+        this.exactTag = exactTag;
+    }
+
     public List<String> getTags() {
         return tags;
     }
@@ -231,6 +241,7 @@ public class SysDocument extends BaseEntity {
                 .append("updateBy", getUpdateBy())
                 .append("updateTime", getUpdateTime())
                 .append("remark", getRemark())
+                .append("exactTag", getExactTag())
                 .append("tags", getTags())
                 .toString();
     }

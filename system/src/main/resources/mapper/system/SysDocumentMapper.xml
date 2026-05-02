@@ -45,6 +45,14 @@
                 WHERE t.tag_name LIKE concat('%', #{searchTag}, '%')
                 )
             </if>
+            <if test="exactTag != null and exactTag != ''">
+                AND document_id IN (
+                SELECT dt.document_id
+                FROM sys_document_tag dt
+                LEFT JOIN sys_tag t ON dt.tag_id = t.tag_id
+                WHERE t.tag_name = #{exactTag}
+                )
+            </if>
             <if test="fileOriginName != null  and fileOriginName != ''"> and file_origin_name like concat('%', #{fileOriginName}, '%')</if>
         </where>
         order by create_time desc

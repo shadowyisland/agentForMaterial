@@ -123,6 +123,32 @@
 		<include refid="selectMenuVo"/>
 		where menu_id = #{menuId}
 	</select>
+
+	<select id="selectDocumentMenuDirectory" resultMap="SysMenuResult">
+		<include refid="selectMenuVo"/>
+		where menu_name = '文档管理'
+		  and menu_type = 'M'
+		  and status = '0'
+		order by menu_id desc
+		limit 1
+	</select>
+
+	<select id="selectMaterialDocumentMenu" parameterType="Long" resultMap="SysMenuResult">
+		<include refid="selectMenuVo"/>
+		where parent_id = #{parentId}
+		  and menu_name = '原材料管理'
+		  and component = 'system/document/index'
+		  and menu_type = 'C'
+		  and status = '0'
+		limit 1
+	</select>
+
+	<select id="selectAutoTagMenuByPath" parameterType="String" resultMap="SysMenuResult">
+		<include refid="selectMenuVo"/>
+		where path = #{path}
+		  and remark = 'AUTO_TAG_MENU'
+		limit 1
+	</select>
 	
 	<select id="hasChildByMenuId" resultType="Integer">
 	    select count(1) from sys_menu where parent_id = #{menuId}  
@@ -157,7 +183,7 @@
 		where menu_id = #{menuId}
 	</update>
 
-	<insert id="insertMenu" parameterType="SysMenu">
+	<insert id="insertMenu" parameterType="SysMenu" useGeneratedKeys="true" keyProperty="menuId">
 		insert into sys_menu(
 		<if test="menuId != null and menuId != 0">menu_id,</if>
 		<if test="parentId != null and parentId != 0">parent_id,</if>
@@ -203,4 +229,17 @@
 	    delete from sys_menu where menu_id = #{menuId}
 	</delete>
 
-</mapper> 
+	<delete id="deleteAllAutoTagMenus">
+	    delete from sys_menu where remark = 'AUTO_TAG_MENU'
+	</delete>
+
+	<delete id="deleteAutoTagMenusNotInPaths">
+	    delete from sys_menu
+	    where remark = 'AUTO_TAG_MENU'
+	      and path not in
+	    <foreach item="path" collection="paths" open="(" separator="," close=")">
+	        #{path}
+	    </foreach>
+	</delete>
+
+</mapper>

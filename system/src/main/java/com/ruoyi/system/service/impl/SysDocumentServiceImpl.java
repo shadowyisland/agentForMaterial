@@ -26,11 +26,7 @@ import com.ruoyi.system.domain.SysTag;
 import com.ruoyi.system.mapper.SysDocumentMapper;
 import com.ruoyi.system.mapper.SysTagMapper;
 import com.ruoyi.system.service.ISysDocumentService;
-import org.springframework.transaction.annotation.Transactional;
-import com.ruoyi.common.utils.DateUtils;
-import com.ruoyi.common.utils.SecurityUtils;
-import com.ruoyi.system.domain.SysTag;
-import com.ruoyi.system.mapper.SysTagMapper;
+import com.ruoyi.system.service.ISysTagMenuService;
 
 /**
  * 文档管理Service业务层处理
@@ -47,6 +43,9 @@ public class SysDocumentServiceImpl implements ISysDocumentService {
 
     @Autowired
     private SysTagMapper sysTagMapper; // 引入标签Mapper
+
+    @Autowired
+    private ISysTagMenuService tagMenuService;
 
     @Override
     public SysDocument selectDocumentById(Long documentId) {
@@ -66,11 +65,13 @@ public class SysDocumentServiceImpl implements ISysDocumentService {
 
         // 2. 检查是否已经关联过该标签，避免重复插入报错
         int count = sysTagMapper.checkDocumentTag(documentId, tagId);
+        int rows = 1;
         if (count == 0) {
             // 3. 建立文档和标签的关联
-            return sysTagMapper.insertDocumentTag(documentId, tagId, DateUtils.getNowDate());
+            rows = sysTagMapper.insertDocumentTag(documentId, tagId, DateUtils.getNowDate());
         }
-        return 1;
+        tagMenuService.syncTagMenus();
+        return rows;
     }
 
     @Override
@@ -83,7 +84,9 @@ public class SysDocumentServiceImpl implements ISysDocumentService {
         Long tagId = getOrCreateTag(tagName, userId);
 
         // 3. 建立新关联
-        return sysTagMapper.insertDocumentTag(documentId, tagId, DateUtils.getNowDate());
+        int rows = sysTagMapper.insertDocumentTag(documentId, tagId, DateUtils.getNowDate());
+        tagMenuService.syncTagMenus();
+        return rows;
     }
 
     /**
@@ -118,6 +121,7 @@ public class SysDocumentServiceImpl implements ISysDocumentService {
         if (document.getTags() != null && !document.getTags().isEmpty()) {
             insertTags(document.getTags(), document.getDocumentId(), document.getCreateBy());
         }
+        tagMenuService.syncTagMenus();
         return rows;
     }
 
@@ -140,6 +144,7 @@ public class SysDocumentServiceImpl implements ISysDocumentService {
             if (!document.getTags().isEmpty()) {
                 insertTags(document.getTags(), document.getDocumentId(), document.getUpdateBy());
             }
+            tagMenuService.syncTagMenus();
         }
 
         return rows;
@@ -181,10 +186,12 @@ public class SysDocumentServiceImpl implements ISysDocumentService {
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public int deleteDocumentByIds(Long[] documentIds) {
-        // 建议：删除文档时，最好同时也删除 sys_document_tag 表中的关联记录
-        // sysTagMapper.deleteDocTagByDocIds(documentIds);
-        return documentMapper.deleteDocumentByIds(documentIds);
+        sysTagMapper.deleteDocTagByDocIds(documentIds);
+        int rows = documentMapper.deleteDocumentByIds(documentIds);
+        tagMenuService.syncTagMenus();
+        return rows;
     }
 
     /**
