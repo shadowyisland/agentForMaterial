@@ -1,5 +1,6 @@
 package com.ruoyi.system.domain;
 
+import java.util.List;
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
 import com.ruoyi.common.core.domain.BaseEntity;
@@ -18,6 +19,12 @@ public class SysTag extends BaseEntity
     private String tagName;
 
     private String tagKey;
+
+    private Long documentCount;
+
+    private List<String> documentNames;
+
+    private String status;
 
     public void setTagId(Long tagId)
     {
@@ -56,6 +63,36 @@ public class SysTag extends BaseEntity
         return tagKey;
     }
 
+    public Long getDocumentCount()
+    {
+        return documentCount;
+    }
+
+    public void setDocumentCount(Long documentCount)
+    {
+        this.documentCount = documentCount;
+    }
+
+    public List<String> getDocumentNames()
+    {
+        return documentNames;
+    }
+
+    public void setDocumentNames(List<String> documentNames)
+    {
+        this.documentNames = documentNames;
+    }
+
+    public String getStatus()
+    {
+        return status;
+    }
+
+    public void setStatus(String status)
+    {
+        this.status = status;
+    }
+
     @Override
     public String toString() {
         return new ToStringBuilder(this,ToStringStyle.MULTI_LINE_STYLE)
@@ -63,6 +100,9 @@ public class SysTag extends BaseEntity
                 .append("ownerUserId", getOwnerUserId())
                 .append("tagName", getTagName())
                 .append("tagKey", getTagKey())
+                .append("documentCount", getDocumentCount())
+                .append("documentNames", getDocumentNames())
+                .append("status", getStatus())
                 .toString();
     }
 }

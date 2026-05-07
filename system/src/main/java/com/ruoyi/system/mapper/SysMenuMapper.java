@@ -93,9 +93,24 @@ public interface SysMenuMapper
     public SysMenu selectMaterialDocumentMenu(Long parentId);
 
     /**
+     * 查询标签管理菜单
+     */
+    public SysMenu selectTagManageMenu(Long parentId);
+
+    /**
      * 根据路由查询自动标签菜单
      */
     public SysMenu selectAutoTagMenuByPath(String path);
+
+    /**
+     * 更新自动标签菜单状态
+     */
+    public int updateAutoTagMenuStatus(@Param("path") String path, @Param("status") String status);
+
+    /**
+     * 根据路由删除自动标签菜单
+     */
+    public int deleteAutoTagMenuByPath(String path);
 
     /**
      * 删除全部自动标签菜单

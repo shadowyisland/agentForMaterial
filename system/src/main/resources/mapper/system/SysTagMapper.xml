@@ -9,7 +9,49 @@
         <result property="ownerUserId"    column="owner_user_id"    />
         <result property="tagName"    column="tag_name"    />
         <result property="tagKey"    column="tag_key"    />
+        <result property="createBy"    column="create_by"    />
+        <result property="createTime"    column="create_time"    />
+        <result property="updateTime"    column="update_time"    />
+        <result property="remark"    column="remark"    />
+        <result property="documentCount"    column="document_count"    />
+        <result property="status"    column="status"    />
+        <collection property="documentNames" javaType="java.util.List" ofType="String" select="selectDocumentNamesByTagId" column="tag_id"/>
     </resultMap>
+
+    <sql id="selectTagVo">
+        SELECT t.tag_id,
+               t.owner_user_id,
+               t.tag_name,
+               t.tag_key,
+               t.create_by,
+               t.create_time,
+               t.update_time,
+               t.remark,
+               COUNT(DISTINCT d.document_id) AS document_count,
+               IFNULL(m.status, '0') AS status
+        FROM sys_tag t
+                 LEFT JOIN sys_document_tag dt ON t.tag_id = dt.tag_id
+                 LEFT JOIN sys_document d ON dt.document_id = d.document_id AND d.del_flag = '0'
+                 LEFT JOIN sys_menu m ON m.path = concat('tag-', t.tag_id) AND m.remark = 'AUTO_TAG_MENU'
+    </sql>
+
+    <select id="selectTagList" parameterType="SysTag" resultMap="SysTagResult">
+        <include refid="selectTagVo"/>
+        <where>
+            t.del_flag = '0'
+            <if test="tagName != null and tagName != ''"> and t.tag_name like concat('%', #{tagName}, '%')</if>
+            <if test="ownerUserId != null"> and t.owner_user_id = #{ownerUserId}</if>
+        </where>
+        GROUP BY t.tag_id, t.owner_user_id, t.tag_name, t.tag_key, t.create_by, t.create_time, t.update_time, t.remark, m.status
+        ORDER BY t.create_time DESC
+    </select>
+
+    <select id="selectTagById" parameterType="Long" resultMap="SysTagResult">
+        <include refid="selectTagVo"/>
+        WHERE t.del_flag = '0'
+          AND t.tag_id = #{tagId}
+        GROUP BY t.tag_id, t.owner_user_id, t.tag_name, t.tag_key, t.create_by, t.create_time, t.update_time, t.remark, m.status
+    </select>
 
     <select id="checkTagUnique" resultMap="SysTagResult">
         SELECT tag_id, tag_name FROM sys_tag
@@ -22,14 +64,40 @@
         <if test="ownerUserId != null">owner_user_id,</if>
         <if test="tagName != null">tag_name,</if>
         <if test="createBy != null">create_by,</if>
+        <if test="remark != null">remark,</if>
         create_time
         ) VALUES (
         <if test="ownerUserId != null">#{ownerUserId},</if>
         <if test="tagName != null">#{tagName},</if>
         <if test="createBy != null">#{createBy},</if>
+        <if test="remark != null">#{remark},</if>
         sysdate()
         )
     </insert>
+
+    <update id="updateTag" parameterType="SysTag">
+        UPDATE sys_tag
+        <set>
+            <if test="tagName != null and tagName != ''">tag_name = #{tagName},</if>
+            <if test="remark != null">remark = #{remark},</if>
+            update_time = sysdate()
+        </set>
+        WHERE tag_id = #{tagId}
+          AND del_flag = '0'
+    </update>
+
+    <delete id="deleteTagById" parameterType="Long">
+        DELETE FROM sys_tag WHERE tag_id = #{tagId}
+    </delete>
+
+    <select id="selectDocumentNamesByTagId" parameterType="Long" resultType="String">
+        SELECT d.document_name
+        FROM sys_document d
+                 INNER JOIN sys_document_tag dt ON d.document_id = dt.document_id
+        WHERE dt.tag_id = #{tagId}
+          AND d.del_flag = '0'
+        ORDER BY d.create_time DESC
+    </select>
 
     <select id="selectTagsByUserId" resultType="String">
         SELECT t.tag_name
@@ -41,18 +109,58 @@
     </select>
 
     <select id="selectUsedDocumentTags" resultMap="SysTagResult">
-        SELECT MIN(t.tag_id) AS tag_id,
-               MIN(t.owner_user_id) AS owner_user_id,
+        SELECT t.tag_id,
+               t.owner_user_id,
                t.tag_name,
-               MIN(t.tag_key) AS tag_key
+               t.tag_key
         FROM sys_tag t
                  INNER JOIN sys_document_tag dt ON t.tag_id = dt.tag_id
                  INNER JOIN sys_document d ON dt.document_id = d.document_id
         WHERE t.del_flag = '0'
           AND d.del_flag = '0'
-        GROUP BY t.tag_name
-        ORDER BY MIN(t.tag_id)
+        GROUP BY t.tag_id, t.owner_user_id, t.tag_name, t.tag_key
+        ORDER BY t.tag_id
     </select>
+
+    <select id="selectTagIdsByDocumentId" parameterType="Long" resultType="Long">
+        SELECT tag_id
+        FROM sys_document_tag
+        WHERE document_id = #{documentId}
+    </select>
+
+    <select id="selectTagIdsByDocumentIds" parameterType="Long" resultType="Long">
+        SELECT DISTINCT tag_id
+        FROM sys_document_tag
+        WHERE document_id in
+        <foreach item="documentId" collection="array" open="(" separator="," close=")">
+            #{documentId}
+        </foreach>
+    </select>
+
+    <select id="selectUnusedTagIds" resultType="Long">
+        SELECT t.tag_id
+        FROM sys_tag t
+        WHERE t.del_flag = '0'
+          AND t.tag_id in
+        <foreach item="tagId" collection="tagIds" open="(" separator="," close=")">
+            #{tagId}
+        </foreach>
+          AND NOT EXISTS (
+              SELECT 1
+              FROM sys_document_tag dt
+                       INNER JOIN sys_document d ON dt.document_id = d.document_id
+              WHERE dt.tag_id = t.tag_id
+                AND d.del_flag = '0'
+          )
+    </select>
+
+    <delete id="deleteTagByIds">
+        DELETE FROM sys_tag
+        WHERE tag_id in
+        <foreach item="tagId" collection="tagIds" open="(" separator="," close=")">
+            #{tagId}
+        </foreach>
+    </delete>
 
     <insert id="insertDocTag">
         INSERT INTO sys_document_tag(document_id, tag_id) VALUES (#{documentId}, #{tagId})
@@ -91,6 +199,18 @@
 
     <delete id="deleteDocumentTagByDocumentId">
         delete from sys_document_tag where document_id = #{documentId}
+    </delete>
+
+    <delete id="deleteDocumentTagByTagId">
+        delete from sys_document_tag where tag_id = #{tagId}
+    </delete>
+
+    <delete id="deleteDocumentTagByTagIds">
+        delete from sys_document_tag
+        where tag_id in
+        <foreach item="tagId" collection="tagIds" open="(" separator="," close=")">
+            #{tagId}
+        </foreach>
     </delete>
 
 </mapper>

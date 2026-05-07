@@ -54,6 +54,11 @@ public interface SysRoleMenuMapper
     public int copyRoleMenuBySourceMenu(@Param("sourceMenuId") Long sourceMenuId, @Param("targetMenuId") Long targetMenuId);
 
     /**
+     * 复制用户所属角色到新菜单
+     */
+    public int copyRoleMenuByUserRoles(@Param("userId") Long userId, @Param("targetMenuId") Long targetMenuId);
+
+    /**
      * 删除全部自动标签菜单的角色授权
      */
     public int deleteRoleMenuByAllAutoTagMenus();
@@ -62,4 +67,9 @@ public interface SysRoleMenuMapper
      * 删除不再使用的自动标签菜单角色授权
      */
     public int deleteRoleMenuByAutoTagMenusNotInPaths(List<String> paths);
+
+    /**
+     * 根据自动标签菜单路由删除角色授权
+     */
+    public int deleteRoleMenuByAutoTagMenuPath(String path);
 }

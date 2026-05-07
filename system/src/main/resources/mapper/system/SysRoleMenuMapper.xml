@@ -42,6 +42,13 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 		where menu_id = #{sourceMenuId}
 	</insert>
 
+	<insert id="copyRoleMenuByUserRoles">
+		insert ignore into sys_role_menu(role_id, menu_id)
+		select role_id, #{targetMenuId}
+		from sys_user_role
+		where user_id = #{userId}
+	</insert>
+
 	<delete id="deleteRoleMenuByAllAutoTagMenus">
 		delete from sys_role_menu
 		where menu_id in (
@@ -59,6 +66,16 @@ PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
 			<foreach item="path" collection="list" open="(" separator="," close=")">
 				#{path}
 			</foreach>
+		)
+	</delete>
+
+	<delete id="deleteRoleMenuByAutoTagMenuPath">
+		delete from sys_role_menu
+		where menu_id in (
+			select menu_id
+			from sys_menu
+			where remark = 'AUTO_TAG_MENU'
+			  and path = #{path}
 		)
 	</delete>
 	

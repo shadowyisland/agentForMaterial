@@ -77,6 +77,7 @@ public class SysDocumentServiceImpl implements ISysDocumentService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public int replaceDocumentTag(Long documentId, String tagName, Long userId) {
+        List<Long> oldTagIds = sysTagMapper.selectTagIdsByDocumentId(documentId);
         // 1. 删除该文档原有的所有标签关联
         sysTagMapper.deleteDocumentTagByDocumentId(documentId);
 
@@ -85,6 +86,7 @@ public class SysDocumentServiceImpl implements ISysDocumentService {
 
         // 3. 建立新关联
         int rows = sysTagMapper.insertDocumentTag(documentId, tagId, DateUtils.getNowDate());
+        cleanUnusedTags(oldTagIds);
         tagMenuService.syncTagMenus();
         return rows;
     }
@@ -137,6 +139,7 @@ public class SysDocumentServiceImpl implements ISysDocumentService {
         // 3. 处理标签更新逻辑
         // 只有当前端传来了 tags 字段（哪怕是空数组），才进行标签更新
         if (document.getTags() != null) {
+            List<Long> oldTagIds = sysTagMapper.selectTagIdsByDocumentId(document.getDocumentId());
             // A. 先删除该文档关联的所有旧标签
             sysTagMapper.deleteDocTagByDocId(document.getDocumentId());
 
@@ -144,6 +147,7 @@ public class SysDocumentServiceImpl implements ISysDocumentService {
             if (!document.getTags().isEmpty()) {
                 insertTags(document.getTags(), document.getDocumentId(), document.getUpdateBy());
             }
+            cleanUnusedTags(oldTagIds);
             tagMenuService.syncTagMenus();
         }
 
@@ -188,10 +192,27 @@ public class SysDocumentServiceImpl implements ISysDocumentService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public int deleteDocumentByIds(Long[] documentIds) {
+        List<Long> affectedTagIds = sysTagMapper.selectTagIdsByDocumentIds(documentIds);
         sysTagMapper.deleteDocTagByDocIds(documentIds);
         int rows = documentMapper.deleteDocumentByIds(documentIds);
+        cleanUnusedTags(affectedTagIds);
         tagMenuService.syncTagMenus();
         return rows;
+    }
+
+    private void cleanUnusedTags(List<Long> tagIds) {
+        if (tagIds == null || tagIds.isEmpty()) {
+            return;
+        }
+        List<Long> unusedTagIds = sysTagMapper.selectUnusedTagIds(tagIds);
+        if (unusedTagIds == null || unusedTagIds.isEmpty()) {
+            return;
+        }
+        for (Long tagId : unusedTagIds) {
+            tagMenuService.deleteTagMenuByTagId(tagId);
+        }
+        sysTagMapper.deleteDocumentTagByTagIds(unusedTagIds);
+        sysTagMapper.deleteTagByIds(unusedTagIds);
     }
 
     /**

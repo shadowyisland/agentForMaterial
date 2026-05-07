@@ -143,12 +143,30 @@
 		limit 1
 	</select>
 
+	<select id="selectTagManageMenu" parameterType="Long" resultMap="SysMenuResult">
+		<include refid="selectMenuVo"/>
+		where parent_id = #{parentId}
+		  and menu_name = '标签管理'
+		  and component = 'system/tag/index'
+		  and menu_type = 'C'
+		limit 1
+	</select>
+
 	<select id="selectAutoTagMenuByPath" parameterType="String" resultMap="SysMenuResult">
 		<include refid="selectMenuVo"/>
 		where path = #{path}
 		  and remark = 'AUTO_TAG_MENU'
 		limit 1
 	</select>
+
+	<update id="updateAutoTagMenuStatus">
+		update sys_menu
+		set status = #{status},
+		    update_by = 'system',
+		    update_time = sysdate()
+		where path = #{path}
+		  and remark = 'AUTO_TAG_MENU'
+	</update>
 	
 	<select id="hasChildByMenuId" resultType="Integer">
 	    select count(1) from sys_menu where parent_id = #{menuId}  
@@ -240,6 +258,12 @@
 	    <foreach item="path" collection="paths" open="(" separator="," close=")">
 	        #{path}
 	    </foreach>
+	</delete>
+
+	<delete id="deleteAutoTagMenuByPath">
+	    delete from sys_menu
+	    where remark = 'AUTO_TAG_MENU'
+	      and path = #{path}
 	</delete>
 
 </mapper>

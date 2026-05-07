@@ -66,7 +66,7 @@
 </template>
 
 <script>
-import { getCodeImg } from "@/api/login"
+// import { getCodeImg } from "@/api/login"
 import Cookies from "js-cookie"
 import { encrypt, decrypt } from '@/utils/jsencrypt'
 import defaultSettings from '@/settings'
@@ -91,12 +91,13 @@ export default {
         ],
         password: [
           { required: true, trigger: "blur", message: "请输入您的密码" }
-        ],
-        code: [{ required: true, trigger: "change", message: "请输入验证码" }]
+        ]
+        // 验证码校验已取消，如需恢复取消下一行注释
+        // ,code: [{ required: true, trigger: "change", message: "请输入验证码" }]
       },
       loading: false,
       // 验证码开关
-      captchaEnabled: true,
+      captchaEnabled: false,
       // 注册开关
       register: false,
       redirect: undefined
@@ -111,19 +112,21 @@ export default {
     }
   },
   created() {
-    this.getCode()
+    // 登录验证码已取消，如需恢复取消下一行注释
+    // this.getCode()
     this.getCookie()
   },
   methods: {
-    getCode() {
-      getCodeImg().then(res => {
-        this.captchaEnabled = res.captchaEnabled === undefined ? true : res.captchaEnabled
-        if (this.captchaEnabled) {
-          this.codeUrl = "data:image/gif;base64," + res.img
-          this.loginForm.uuid = res.uuid
-        }
-      })
-    },
+    // 登录验证码已取消，保留原方法方便后续恢复
+    // getCode() {
+    //   getCodeImg().then(res => {
+    //     this.captchaEnabled = res.captchaEnabled === undefined ? true : res.captchaEnabled
+    //     if (this.captchaEnabled) {
+    //       this.codeUrl = "data:image/gif;base64," + res.img
+    //       this.loginForm.uuid = res.uuid
+    //     }
+    //   })
+    // },
     getCookie() {
       const username = Cookies.get("username")
       const password = Cookies.get("password")
@@ -151,9 +154,10 @@ export default {
             this.$router.push({ path: this.redirect || "/" }).catch(()=>{})
           }).catch(() => {
             this.loading = false
-            if (this.captchaEnabled) {
-              this.getCode()
-            }
+            // 登录验证码已取消，如需恢复取消下面三行注释
+            // if (this.captchaEnabled) {
+            //   this.getCode()
+            // }
           })
         }
       })
