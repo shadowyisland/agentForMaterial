@@ -28,7 +28,7 @@
                t.update_time,
                t.remark,
                COUNT(DISTINCT d.document_id) AS document_count,
-               IFNULL(m.status, '0') AS status
+               IFNULL(m.status, '1') AS status
         FROM sys_tag t
                  LEFT JOIN sys_document_tag dt ON t.tag_id = dt.tag_id
                  LEFT JOIN sys_document d ON dt.document_id = d.document_id AND d.del_flag = '0'

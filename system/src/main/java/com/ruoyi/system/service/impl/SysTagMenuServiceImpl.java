@@ -59,7 +59,8 @@ public class SysTagMenuServiceImpl implements ISysTagMenuService
             {
                 menu = newTagMenu(parentMenu.getMenuId(), tag, path, orderNum);
                 menuMapper.insertMenu(menu);
-                roleMenuMapper.copyRoleMenuByUserRoles(tag.getOwnerUserId(), menu.getMenuId());
+//                roleMenuMapper.copyRoleMenuByUserRoles(tag.getOwnerUserId(), menu.getMenuId());
+
             }
             else
             {
@@ -136,6 +137,8 @@ public class SysTagMenuServiceImpl implements ISysTagMenuService
         SysMenu menu = new SysMenu();
         menu.setCreateBy("system");
         fillTagMenu(menu, parentId, tag, path, orderNum);
+        // 新标签默认关闭，由管理员在标签管理中手动开启。
+        menu.setStatus("1");
         return menu;
     }
 
