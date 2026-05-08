@@ -3,6 +3,7 @@ package com.ruoyi.system.service.impl;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 
 import javax.imageio.ImageIO;
@@ -21,6 +22,7 @@ import com.ruoyi.common.ocr.BaiduOcrService;
 import com.ruoyi.common.utils.DateUtils;
 import com.ruoyi.common.utils.SecurityUtils;
 import com.ruoyi.common.utils.StringUtils;
+import com.ruoyi.common.utils.file.FileUtils;
 import com.ruoyi.system.domain.SysDocument;
 import com.ruoyi.system.domain.SysTag;
 import com.ruoyi.system.mapper.SysDocumentMapper;
@@ -192,12 +194,34 @@ public class SysDocumentServiceImpl implements ISysDocumentService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public int deleteDocumentByIds(Long[] documentIds) {
+        List<SysDocument> documents = new ArrayList<SysDocument>();
+        for (Long documentId : documentIds) {
+            SysDocument document = documentMapper.selectDocumentById(documentId);
+            if (document != null) {
+                documents.add(document);
+            }
+        }
         List<Long> affectedTagIds = sysTagMapper.selectTagIdsByDocumentIds(documentIds);
         sysTagMapper.deleteDocTagByDocIds(documentIds);
         int rows = documentMapper.deleteDocumentByIds(documentIds);
         cleanUnusedTags(affectedTagIds);
         tagMenuService.syncTagMenus();
+        deleteLocalFiles(documents);
         return rows;
+    }
+
+    private void deleteLocalFiles(List<SysDocument> documents) {
+        if (documents == null || documents.isEmpty()) {
+            return;
+        }
+        for (SysDocument document : documents) {
+            String filePath = document.getFilePath();
+            if (StringUtils.isEmpty(filePath) || !filePath.contains(Constants.RESOURCE_PREFIX)) {
+                continue;
+            }
+            String localPath = RuoYiConfig.getProfile() + StringUtils.substringAfter(filePath, Constants.RESOURCE_PREFIX);
+            FileUtils.deleteFile(localPath);
+        }
     }
 
     private void cleanUnusedTags(List<Long> tagIds) {
