@@ -149,6 +149,19 @@ export const constantRoutes = [
           meta: { title: '个人中心', icon: 'user' }
         }
       ]
+    },
+    {
+      path: '/material/tag-manage',
+      component: Layout,
+      hidden: true,
+      children: [
+        {
+          path: '',
+          component: () => import('@/views/system/tag/index'),
+          name: 'MaterialTagManage',
+          meta: { title: '标签管理', activeMenu: '/material/tag' }
+        }
+      ]
     }
   ]
 

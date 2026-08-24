@@ -10,7 +10,9 @@
 
     <el-submenu v-else ref="subMenu" :index="resolvePath(item.path)" popper-append-to-body>
       <template slot="title">
-        <item v-if="item.meta" :icon="item.meta && item.meta.icon" :title="item.meta.title" />
+        <span class="submenu-title-content" @click="handleSubmenuTitleClick">
+          <item v-if="item.meta" :icon="item.meta && item.meta.icon" :title="item.meta.title" />
+        </span>
       </template>
       <sidebar-item
         v-for="(child, index) in item.children"
@@ -93,6 +95,11 @@ export default {
         return { path: path.resolve(this.basePath, routePath), query: query }
       }
       return path.resolve(this.basePath, routePath)
+    },
+    handleSubmenuTitleClick() {
+      if (this.item.meta && this.item.meta.title === '标签管理') {
+        this.$router.push('/material/tag-manage')
+      }
     }
   }
 }

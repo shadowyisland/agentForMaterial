@@ -40,11 +40,11 @@ public class SysTagMenuServiceImpl implements ISysTagMenuService
             return;
         }
 
-        ensureTagManageMenu(parentMenu.getMenuId());
+        SysMenu tagManageMenu = ensureTagManageMenu(parentMenu.getMenuId());
 
         List<SysTag> tags = tagMapper.selectUsedDocumentTags();
         List<String> activePaths = new ArrayList<String>();
-        int orderNum = 3;
+        int orderNum = 1;
         for (SysTag tag : tags)
         {
             if (tag == null || tag.getTagId() == null || StringUtils.isEmpty(tag.getTagName()))
@@ -57,7 +57,7 @@ public class SysTagMenuServiceImpl implements ISysTagMenuService
             SysMenu menu = menuMapper.selectAutoTagMenuByPath(path);
             if (menu == null)
             {
-                menu = newTagMenu(parentMenu.getMenuId(), tag, path, orderNum);
+                menu = newTagMenu(tagManageMenu.getMenuId(), tag, path, orderNum);
                 menuMapper.insertMenu(menu);
 //                roleMenuMapper.copyRoleMenuByUserRoles(tag.getOwnerUserId(), menu.getMenuId());
 
@@ -65,7 +65,7 @@ public class SysTagMenuServiceImpl implements ISysTagMenuService
             else
             {
                 String status = StringUtils.isEmpty(menu.getStatus()) ? "0" : menu.getStatus();
-                fillTagMenu(menu, parentMenu.getMenuId(), tag, path, orderNum);
+                fillTagMenu(menu, tagManageMenu.getMenuId(), tag, path, orderNum);
                 menu.setStatus(status);
                 menuMapper.updateMenu(menu);
             }
@@ -107,7 +107,7 @@ public class SysTagMenuServiceImpl implements ISysTagMenuService
         menuMapper.deleteAutoTagMenuByPath(path);
     }
 
-    private void ensureTagManageMenu(Long parentId)
+    private SysMenu ensureTagManageMenu(Long parentId)
     {
         SysMenu menu = menuMapper.selectTagManageMenu(parentId);
         if (menu == null)
@@ -117,19 +117,38 @@ public class SysTagMenuServiceImpl implements ISysTagMenuService
             menu.setParentId(parentId);
             menu.setOrderNum(2);
             menu.setPath("tag");
-            menu.setComponent("system/tag/index");
+            menu.setComponent("");
             menu.setRouteName("TagManage");
             menu.setIsFrame("1");
             menu.setIsCache("0");
-            menu.setMenuType("C");
+            menu.setMenuType("M");
             menu.setVisible("0");
             menu.setStatus("0");
-            menu.setPerms("system:tag:list");
-            menu.setIcon("tag");
+            menu.setPerms("");
+            menu.setIcon("dict");
             menu.setRemark("标签管理页面");
             menu.setCreateBy("system");
             menuMapper.insertMenu(menu);
         }
+        else
+        {
+            menu.setParentId(parentId);
+            menu.setOrderNum(2);
+            menu.setPath("tag");
+            menu.setComponent("");
+            menu.setRouteName("TagManage");
+            menu.setIsFrame("1");
+            menu.setIsCache("0");
+            menu.setMenuType("M");
+            menu.setVisible("0");
+            menu.setStatus("0");
+            menu.setPerms("");
+            menu.setIcon("dict");
+            menu.setRemark("标签管理页面");
+            menu.setUpdateBy("system");
+            menuMapper.updateMenu(menu);
+        }
+        return menu;
     }
 
     private SysMenu newTagMenu(Long parentId, SysTag tag, String path, int orderNum)
@@ -157,7 +176,7 @@ public class SysTagMenuServiceImpl implements ISysTagMenuService
         menu.setVisible("0");
         menu.setStatus("0");
         menu.setPerms("system:document:list");
-        menu.setIcon("pdf");
+        menu.setIcon("");
         menu.setRemark(AUTO_TAG_MENU);
         menu.setUpdateBy("system");
     }
