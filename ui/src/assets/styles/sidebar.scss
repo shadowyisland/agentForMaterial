@@ -24,8 +24,8 @@
     left: 0;
     z-index: 1001;
     overflow: hidden;
-    -webkit-box-shadow: 2px 0 6px rgba(0,21,41,.35);
-    box-shadow: 0px 0px 8px 0px rgba(0, 0, 0, 0.1);
+    -webkit-box-shadow: 2px 0 12px rgba(0,21,41,.22);
+    box-shadow: 2px 0 12px rgba(0,21,41,.12);
 
     // reset element-ui css
     .horizontal-collapse-transition {
@@ -46,7 +46,7 @@
 
     &.has-logo {
       .el-scrollbar {
-        height: calc(100% - 70px);
+        height: calc(100% - 78px);
       }
     }
 
@@ -74,13 +74,17 @@
       overflow: hidden !important;
       text-overflow: ellipsis !important;
       white-space: nowrap !important;
+      height: 48px;
+      line-height: 48px;
+      margin: 3px 8px;
+      border-radius: 8px;
     }
 
     // menu hover
     .submenu-title-noDropdown,
     .el-submenu__title {
       &:hover {
-        background-color: rgba(0, 0, 0, 0.06) !important;
+        background-color: rgba(39, 132, 220, 0.18) !important;
       }
     }
 
@@ -88,9 +92,15 @@
       color: $base-menu-color-active !important;
     }
 
+    & .theme-dark .el-menu-item.is-active {
+      color: #ffffff !important;
+      background: linear-gradient(90deg, #1267bf, #1687d8) !important;
+      box-shadow: 0 6px 16px rgba(0, 90, 180, .22);
+    }
+
     & .nest-menu .el-submenu>.el-submenu__title,
     & .el-submenu .el-menu-item {
-      min-width: $base-sidebar-width !important;
+      min-width: calc(#{$base-sidebar-width} - 16px) !important;
 
       &:hover {
         background-color: rgba(0, 0, 0, 0.06) !important;
@@ -103,6 +113,21 @@
 
       &:hover {
         background-color: $base-sub-menu-hover !important;
+      }
+    }
+
+    // 第三级材料分类压缩默认缩进，确保完整显示较长的中文分类名
+    .nest-menu .nest-menu .el-menu-item {
+      padding-left: 32px !important;
+      font-size: 13px;
+
+      .svg-icon {
+        margin-right: 7px;
+      }
+
+      span {
+        overflow: visible;
+        text-overflow: clip;
       }
     }
   }

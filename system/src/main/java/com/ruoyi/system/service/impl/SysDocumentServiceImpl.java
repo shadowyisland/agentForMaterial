@@ -4,7 +4,11 @@ import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 import javax.imageio.ImageIO;
 
@@ -24,11 +28,13 @@ import com.ruoyi.common.utils.SecurityUtils;
 import com.ruoyi.common.utils.StringUtils;
 import com.ruoyi.common.utils.file.FileUtils;
 import com.ruoyi.system.domain.SysDocument;
+import com.ruoyi.system.domain.SysDocumentRecord;
 import com.ruoyi.system.domain.SysTag;
+import com.ruoyi.system.constant.DocumentConstants;
 import com.ruoyi.system.mapper.SysDocumentMapper;
+import com.ruoyi.system.mapper.SysDocumentRecordMapper;
 import com.ruoyi.system.mapper.SysTagMapper;
 import com.ruoyi.system.service.ISysDocumentService;
-import com.ruoyi.system.service.ISysTagMenuService;
 
 /**
  * 文档管理Service业务层处理
@@ -47,7 +53,7 @@ public class SysDocumentServiceImpl implements ISysDocumentService {
     private SysTagMapper sysTagMapper; // 引入标签Mapper
 
     @Autowired
-    private ISysTagMenuService tagMenuService;
+    private SysDocumentRecordMapper recordMapper;
 
     @Override
     public SysDocument selectDocumentById(Long documentId) {
@@ -56,14 +62,56 @@ public class SysDocumentServiceImpl implements ISysDocumentService {
 
     @Override
     public List<SysDocument> selectDocumentList(SysDocument document) {
+        normalizeQueryScope(document);
         return documentMapper.selectDocumentList(document);
+    }
+
+    @Override
+    public List<SysDocument> searchDocumentList(SysDocument document) {
+        if (document == null || StringUtils.isEmpty(document.getKeyword())) {
+            throw new ServiceException("请输入检索关键词");
+        }
+        String keyword = document.getKeyword().trim();
+        if (keyword.length() > 100) {
+            throw new ServiceException("检索关键词不能超过100个字符");
+        }
+        List<String> rawKeywords = Arrays.stream(keyword.split("\\s+"))
+                .filter(StringUtils::isNotEmpty)
+                .distinct()
+                .limit(10)
+                .collect(Collectors.toList());
+        if (rawKeywords.isEmpty()) {
+            throw new ServiceException("请输入有效的检索关键词");
+        }
+        String scope = document.getSearchScope();
+        if (!DocumentConstants.SEARCH_OCR.equals(scope) && !DocumentConstants.SEARCH_RECORD.equals(scope)) {
+            scope = DocumentConstants.SEARCH_ALL;
+        }
+        document.setSearchScope(scope);
+        document.setKeywords(rawKeywords.stream().map(this::escapeLike).collect(Collectors.toList()));
+
+        List<SysDocument> documents = documentMapper.searchDocumentList(document);
+        for (SysDocument item : documents) {
+            fillMatchMetadata(item, rawKeywords, scope);
+        }
+        return documents;
+    }
+
+    @Override
+    public Map<String, Object> selectDocumentStats(SysDocument document) {
+        normalizeQueryScope(document);
+        return documentMapper.selectDocumentStats(document);
     }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
     public int addDocumentTag(Long documentId, String tagName, Long userId) {
+        SysDocument document = documentMapper.selectDocumentById(documentId);
+        if (document == null) {
+            throw new ServiceException("文档不存在");
+        }
         // 1. 获取或创建标签
-        Long tagId = getOrCreateTag(tagName, userId);
+        Long tagId = getOrCreateTag(tagName, document.getDocumentType(), document.getMaterialCategory(), userId);
 
         // 2. 检查是否已经关联过该标签，避免重复插入报错
         int count = sysTagMapper.checkDocumentTag(documentId, tagId);
@@ -72,37 +120,40 @@ public class SysDocumentServiceImpl implements ISysDocumentService {
             // 3. 建立文档和标签的关联
             rows = sysTagMapper.insertDocumentTag(documentId, tagId, DateUtils.getNowDate());
         }
-        tagMenuService.syncTagMenus();
         return rows;
     }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
     public int replaceDocumentTag(Long documentId, String tagName, Long userId) {
-        List<Long> oldTagIds = sysTagMapper.selectTagIdsByDocumentId(documentId);
+        SysDocument document = documentMapper.selectDocumentById(documentId);
+        if (document == null) {
+            throw new ServiceException("文档不存在");
+        }
         // 1. 删除该文档原有的所有标签关联
         sysTagMapper.deleteDocumentTagByDocumentId(documentId);
 
         // 2. 获取或创建新标签
-        Long tagId = getOrCreateTag(tagName, userId);
+        Long tagId = getOrCreateTag(tagName, document.getDocumentType(), document.getMaterialCategory(), userId);
 
         // 3. 建立新关联
         int rows = sysTagMapper.insertDocumentTag(documentId, tagId, DateUtils.getNowDate());
-        cleanUnusedTags(oldTagIds);
-        tagMenuService.syncTagMenus();
         return rows;
     }
 
     /**
      * 内部方法：获取已有标签，不存在则创建
      */
-    private Long getOrCreateTag(String tagName, Long userId) {
-        // 查询该用户下是否已有同名标签
-        SysTag tag = sysTagMapper.selectTagByNameAndUserId(tagName, userId);
+    private Long getOrCreateTag(String tagName, String documentType, String materialCategory, Long userId) {
+        String cleanTagName = tagName == null ? "" : tagName.trim();
+        SysTag tag = sysTagMapper.selectTagByNameAndScope(cleanTagName, documentType, materialCategory);
         if (tag == null) {
             tag = new SysTag();
-            tag.setTagName(tagName);
+            tag.setTagName(cleanTagName);
             tag.setOwnerUserId(userId);
+            tag.setDocumentType(documentType);
+            tag.setMaterialCategory(materialCategory);
+            tag.setStatus("0");
             tag.setCreateBy(SecurityUtils.getUsername());
             tag.setCreateTime(DateUtils.getNowDate());
             // 插入标签，MyBatis的 useGeneratedKeys 会将生成的 tag_id 回填到对象中
@@ -117,15 +168,16 @@ public class SysDocumentServiceImpl implements ISysDocumentService {
     @Override
     @Transactional // 开启事务，确保文档和标签同时成功
     public int insertDocument(SysDocument document) {
+        normalizeDocumentScope(document);
+        document.setCreateUserId(SecurityUtils.getUserId());
         document.setCreateTime(DateUtils.getNowDate());
         // 1. 保存文档基础信息
         int rows = documentMapper.insertDocument(document);
 
         // 2. 处理标签逻辑
         if (document.getTags() != null && !document.getTags().isEmpty()) {
-            insertTags(document.getTags(), document.getDocumentId(), document.getCreateBy());
+            insertTags(document.getTags(), document, document.getCreateBy());
         }
-        tagMenuService.syncTagMenus();
         return rows;
     }
 
@@ -135,22 +187,31 @@ public class SysDocumentServiceImpl implements ISysDocumentService {
     @Override
     @Transactional
     public int updateDocument(SysDocument document) {
+        SysDocument current = documentMapper.selectDocumentById(document.getDocumentId());
+        if (current == null) {
+            throw new ServiceException("文档不存在");
+        }
+        // 文档所属范围由上传入口确定，普通编辑不能跨分类移动。
+        document.setDocumentType(current.getDocumentType());
+        document.setMaterialCategory(current.getMaterialCategory());
+        if (DocumentConstants.TYPE_INTERNAL.equals(current.getDocumentType())) {
+            document.setSourceName("");
+            document.setSourceUrl("");
+            document.setPublishDate(null);
+        }
         document.setUpdateTime(DateUtils.getNowDate());
         int rows = documentMapper.updateDocument(document);
 
         // 3. 处理标签更新逻辑
         // 只有当前端传来了 tags 字段（哪怕是空数组），才进行标签更新
         if (document.getTags() != null) {
-            List<Long> oldTagIds = sysTagMapper.selectTagIdsByDocumentId(document.getDocumentId());
             // A. 先删除该文档关联的所有旧标签
             sysTagMapper.deleteDocTagByDocId(document.getDocumentId());
 
             // B. 如果有新标签，则重新插入
             if (!document.getTags().isEmpty()) {
-                insertTags(document.getTags(), document.getDocumentId(), document.getUpdateBy());
+                insertTags(document.getTags(), current, document.getUpdateBy());
             }
-            cleanUnusedTags(oldTagIds);
-            tagMenuService.syncTagMenus();
         }
 
         return rows;
@@ -159,7 +220,7 @@ public class SysDocumentServiceImpl implements ISysDocumentService {
     /**
      * 公用方法：插入标签并关联
      */
-    private void insertTags(List<String> tags, Long documentId, String createBy) {
+    private void insertTags(List<String> tags, SysDocument document, String createBy) {
         Long userId = SecurityUtils.getUserId(); // 获取当前登录用户
 
         for (String tagName : tags) {
@@ -170,7 +231,7 @@ public class SysDocumentServiceImpl implements ISysDocumentService {
             String tagKey = cleanTagName.toLowerCase().replaceAll("\\s+", "");
 
             // A. 检查标签是否已存在
-            SysTag tag = sysTagMapper.checkTagUnique(userId, tagKey);
+            SysTag tag = sysTagMapper.checkTagUnique(document.getDocumentType(), document.getMaterialCategory(), tagKey);
             Long tagId;
 
             if (tag == null) {
@@ -179,6 +240,9 @@ public class SysDocumentServiceImpl implements ISysDocumentService {
                 tag.setOwnerUserId(userId);
                 tag.setTagName(cleanTagName);
                 tag.setTagKey(tagKey);
+                tag.setDocumentType(document.getDocumentType());
+                tag.setMaterialCategory(document.getMaterialCategory());
+                tag.setStatus("0");
                 tag.setCreateBy(createBy);
                 sysTagMapper.insertTag(tag);
                 tagId = tag.getTagId();
@@ -187,7 +251,7 @@ public class SysDocumentServiceImpl implements ISysDocumentService {
             }
 
             // C. 在中间表中建立关联
-            sysTagMapper.insertDocTag(documentId, tagId);
+            sysTagMapper.insertDocTag(document.getDocumentId(), tagId);
         }
     }
 
@@ -201,11 +265,8 @@ public class SysDocumentServiceImpl implements ISysDocumentService {
                 documents.add(document);
             }
         }
-        List<Long> affectedTagIds = sysTagMapper.selectTagIdsByDocumentIds(documentIds);
         sysTagMapper.deleteDocTagByDocIds(documentIds);
         int rows = documentMapper.deleteDocumentByIds(documentIds);
-        cleanUnusedTags(affectedTagIds);
-        tagMenuService.syncTagMenus();
         deleteLocalFiles(documents);
         return rows;
     }
@@ -222,21 +283,6 @@ public class SysDocumentServiceImpl implements ISysDocumentService {
             String localPath = RuoYiConfig.getProfile() + StringUtils.substringAfter(filePath, Constants.RESOURCE_PREFIX);
             FileUtils.deleteFile(localPath);
         }
-    }
-
-    private void cleanUnusedTags(List<Long> tagIds) {
-        if (tagIds == null || tagIds.isEmpty()) {
-            return;
-        }
-        List<Long> unusedTagIds = sysTagMapper.selectUnusedTagIds(tagIds);
-        if (unusedTagIds == null || unusedTagIds.isEmpty()) {
-            return;
-        }
-        for (Long tagId : unusedTagIds) {
-            tagMenuService.deleteTagMenuByTagId(tagId);
-        }
-        sysTagMapper.deleteDocumentTagByTagIds(unusedTagIds);
-        sysTagMapper.deleteTagByIds(unusedTagIds);
     }
 
     /**
@@ -273,7 +319,10 @@ public class SysDocumentServiceImpl implements ISysDocumentService {
                 resultContent = baiduOcrService.recognizeGeneral(localPath);
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            doc.setIsRecognized(2);
+            doc.setOcrError(StringUtils.substring(e.getMessage(), 0, 500));
+            doc.setOcrTime(DateUtils.getNowDate());
+            documentMapper.updateDocument(doc);
             throw new ServiceException("识别过程中发生错误: " + e.getMessage());
         }
 
@@ -281,6 +330,7 @@ public class SysDocumentServiceImpl implements ISysDocumentService {
         doc.setIsRecognized(1);
         doc.setOcrContent(resultContent);
         doc.setOcrTime(DateUtils.getNowDate());
+        doc.setOcrError("");
 
         return documentMapper.updateDocument(doc);
     }
@@ -311,17 +361,19 @@ public class SysDocumentServiceImpl implements ISysDocumentService {
 
                 // 2. 创建临时文件保存图片
                 File tempFile = File.createTempFile("ocr_temp_page_" + i, ".jpg");
-                ImageIO.write(bim, "jpg", tempFile);
+                try {
+                    ImageIO.write(bim, "jpg", tempFile);
 
-                // 3. 调用 OCR 识别该临时图片
-                String pageResult = baiduOcrService.recognizeGeneral(tempFile.getAbsolutePath());
+                    // 3. 调用 OCR 识别该临时图片
+                    String pageResult = baiduOcrService.recognizeGeneral(tempFile.getAbsolutePath());
 
-                // 4. 拼接结果
-                fullText.append("=== 第 ").append(i + 1).append(" 页 ===\n");
-                fullText.append(pageResult).append("\n\n");
-
-                // 5. 删除临时文件
-                tempFile.delete();
+                    // 4. 拼接结果
+                    fullText.append("=== 第 ").append(i + 1).append(" 页 ===\n");
+                    fullText.append(pageResult).append("\n\n");
+                } finally {
+                    // OCR 调用异常时也必须清理系统临时目录中的图片
+                    FileUtils.deleteFile(tempFile.getAbsolutePath());
+                }
             }
         } catch (Exception e) {
             fullText.append("PDF 解析失败: ").append(e.getMessage());
@@ -333,5 +385,118 @@ public class SysDocumentServiceImpl implements ISysDocumentService {
         }
 
         return fullText.toString();
+    }
+
+    private void normalizeQueryScope(SysDocument document) {
+        if (document == null) {
+            return;
+        }
+        if (StringUtils.isEmpty(document.getDocumentType())) {
+            return;
+        }
+        String documentType = document.getDocumentType().toUpperCase(Locale.ROOT);
+        if (!DocumentConstants.TYPE_INTERNAL.equals(documentType) && !DocumentConstants.TYPE_EXTERNAL.equals(documentType)) {
+            throw new ServiceException("文档类型不正确");
+        }
+        document.setDocumentType(documentType);
+        if (DocumentConstants.TYPE_INTERNAL.equals(documentType)) {
+            if (StringUtils.isEmpty(document.getMaterialCategory()) || !DocumentConstants.MATERIAL_CATEGORIES.contains(document.getMaterialCategory())) {
+                throw new ServiceException("材料分类不正确");
+            }
+        } else {
+            document.setMaterialCategory(null);
+        }
+    }
+
+    private void normalizeDocumentScope(SysDocument document) {
+        if (StringUtils.isEmpty(document.getDocumentType())) {
+            document.setDocumentType(DocumentConstants.TYPE_INTERNAL);
+        }
+        document.setDocumentType(document.getDocumentType().toUpperCase(Locale.ROOT));
+        if (DocumentConstants.TYPE_INTERNAL.equals(document.getDocumentType())) {
+            if (StringUtils.isEmpty(document.getMaterialCategory())) {
+                document.setMaterialCategory(DocumentConstants.CATEGORY_RAW_MATERIAL);
+            }
+            if (!DocumentConstants.MATERIAL_CATEGORIES.contains(document.getMaterialCategory())) {
+                throw new ServiceException("材料分类不正确");
+            }
+            document.setSourceName(null);
+            document.setSourceUrl(null);
+            document.setPublishDate(null);
+        } else if (DocumentConstants.TYPE_EXTERNAL.equals(document.getDocumentType())) {
+            document.setMaterialCategory(null);
+        } else {
+            throw new ServiceException("文档类型不正确");
+        }
+    }
+
+    private String escapeLike(String value) {
+        return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
+    }
+
+    private void fillMatchMetadata(SysDocument document, List<String> keywords, String scope) {
+        String ocr = StringUtils.defaultString(document.getOcrContent());
+        List<SysDocumentRecord> records = recordMapper.selectRecordListByDocumentId(document.getDocumentId());
+        StringBuilder recordText = new StringBuilder();
+        for (SysDocumentRecord record : records) {
+            recordText.append(StringUtils.defaultString(record.getUsageContent())).append(' ')
+                    .append(StringUtils.defaultString(record.getRemark())).append(' ');
+        }
+
+        boolean ocrMatched = containsAny(ocr, keywords);
+        boolean recordMatched = containsAny(recordText.toString(), keywords);
+        if (DocumentConstants.SEARCH_OCR.equals(scope)) {
+            document.setMatchSource("OCR正文");
+            document.setMatchSnippet(buildSnippet(ocr, keywords));
+        } else if (DocumentConstants.SEARCH_RECORD.equals(scope)) {
+            document.setMatchSource("使用记录与备注");
+            document.setMatchSnippet(buildSnippet(recordText.toString(), keywords));
+        } else {
+            document.setMatchSource(ocrMatched && recordMatched ? "OCR正文 / 使用记录与备注" : (ocrMatched ? "OCR正文" : "使用记录与备注"));
+            document.setMatchSnippet(buildSnippet(ocrMatched ? ocr : recordText.toString(), keywords));
+        }
+        // 搜索结果只返回摘要，避免列表接口携带整篇OCR正文。
+        document.setOcrContent(null);
+    }
+
+    private boolean containsAny(String content, List<String> keywords) {
+        String normalized = StringUtils.defaultString(content).toLowerCase(Locale.ROOT);
+        for (String keyword : keywords) {
+            if (normalized.contains(keyword.toLowerCase(Locale.ROOT))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private String buildSnippet(String content, List<String> keywords) {
+        String compact = StringUtils.defaultString(content).replaceAll("\\s+", " ").trim();
+        if (compact.length() <= 220) {
+            return compact;
+        }
+        String lower = compact.toLowerCase(Locale.ROOT);
+        StringBuilder snippet = new StringBuilder();
+        int lastEnd = -1;
+        for (String keyword : keywords) {
+            int index = lower.indexOf(keyword.toLowerCase(Locale.ROOT));
+            if (index < 0) {
+                continue;
+            }
+            int start = Math.max(0, index - 45);
+            int end = Math.min(compact.length(), index + keyword.length() + 75);
+            if (start <= lastEnd) {
+                continue;
+            }
+            if (snippet.length() > 0) {
+                snippet.append(" … ");
+            }
+            snippet.append(start > 0 ? "…" : "").append(compact, start, end)
+                    .append(end < compact.length() ? "…" : "");
+            lastEnd = end;
+            if (snippet.length() >= 420) {
+                break;
+            }
+        }
+        return snippet.length() == 0 ? compact.substring(0, 220) + "…" : snippet.toString();
     }
 }

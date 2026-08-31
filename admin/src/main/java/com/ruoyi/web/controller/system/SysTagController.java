@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.security.access.prepost.PreAuthorize;
 import com.ruoyi.common.annotation.Log;
 import com.ruoyi.common.core.controller.BaseController;
 import com.ruoyi.common.core.domain.AjaxResult;
@@ -34,6 +35,7 @@ public class SysTagController extends BaseController
      * 查询标签列表
      */
     @GetMapping("/list")
+    @PreAuthorize("@ss.hasPermi('system:tag:list')")
     public TableDataInfo list(SysTag tag)
     {
         startPage();
@@ -45,6 +47,7 @@ public class SysTagController extends BaseController
      * 获取标签详细信息
      */
     @GetMapping(value = "/{tagId}")
+    @PreAuthorize("@ss.hasPermi('system:tag:list')")
     public AjaxResult getInfo(@PathVariable Long tagId)
     {
         return success(tagService.selectTagById(tagId));
@@ -55,6 +58,7 @@ public class SysTagController extends BaseController
      */
     @Log(title = "标签管理", businessType = BusinessType.INSERT)
     @PostMapping
+    @PreAuthorize("@ss.hasRole('admin')")
     public AjaxResult add(@RequestBody SysTag tag)
     {
         if (StringUtils.isEmpty(tag.getTagName()))
@@ -62,6 +66,14 @@ public class SysTagController extends BaseController
             return error("标签名称不能为空");
         }
         tag.setOwnerUserId(getUserId());
+        if (StringUtils.isEmpty(tag.getDocumentType()))
+        {
+            return error("文档类型不能为空");
+        }
+        if (StringUtils.isEmpty(tag.getStatus()))
+        {
+            tag.setStatus("0");
+        }
         tag.setCreateBy(getUsername());
         return toAjax(tagService.insertTag(tag));
     }
@@ -71,6 +83,7 @@ public class SysTagController extends BaseController
      */
     @Log(title = "标签管理", businessType = BusinessType.UPDATE)
     @PutMapping
+    @PreAuthorize("@ss.hasRole('admin')")
     public AjaxResult edit(@RequestBody SysTag tag)
     {
         if (tag.getTagId() == null)
@@ -90,6 +103,7 @@ public class SysTagController extends BaseController
      */
     @Log(title = "标签管理", businessType = BusinessType.DELETE)
     @DeleteMapping("/{tagId}")
+    @PreAuthorize("@ss.hasRole('admin')")
     public AjaxResult remove(@PathVariable Long tagId)
     {
         return toAjax(tagService.deleteTagById(tagId));
@@ -100,6 +114,7 @@ public class SysTagController extends BaseController
      */
     @Log(title = "标签管理-状态切换", businessType = BusinessType.UPDATE)
     @PutMapping("/{tagId}/status")
+    @PreAuthorize("@ss.hasRole('admin')")
     public AjaxResult changeStatus(@PathVariable Long tagId, @RequestParam String status)
     {
         if (!"0".equals(status) && !"1".equals(status))

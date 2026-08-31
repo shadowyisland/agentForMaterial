@@ -9,6 +9,24 @@ export function listTag(query) {
   })
 }
 
+// 新增分类标签（管理员）
+export function addTag(data) {
+  return request({
+    url: '/system/tag',
+    method: 'post',
+    data
+  })
+}
+
+// 修改分类标签（管理员）
+export function updateTag(data) {
+  return request({
+    url: '/system/tag',
+    method: 'put',
+    data
+  })
+}
+
 // 删除标签
 export function delTag(tagId) {
   return request({

@@ -45,3 +45,9 @@ nbdist/
 !*/build/*.java
 !*/build/*.html
 !*/build/*.xml
+
+# 本地临时文件
+.codex_tmp/
+
+# Redis 本地数据
+dump.rdb
