@@ -9,6 +9,8 @@
         <result property="ownerUserId"    column="owner_user_id"    />
         <result property="tagName"    column="tag_name"    />
         <result property="tagKey"    column="tag_key"    />
+        <result property="documentType" column="document_type" />
+        <result property="materialCategory" column="material_category" />
         <result property="createBy"    column="create_by"    />
         <result property="createTime"    column="create_time"    />
         <result property="updateTime"    column="update_time"    />
@@ -23,16 +25,17 @@
                t.owner_user_id,
                t.tag_name,
                t.tag_key,
+               t.document_type,
+               t.material_category,
                t.create_by,
                t.create_time,
                t.update_time,
                t.remark,
                COUNT(DISTINCT d.document_id) AS document_count,
-               IFNULL(m.status, '1') AS status
+               t.status
         FROM sys_tag t
                  LEFT JOIN sys_document_tag dt ON t.tag_id = dt.tag_id
                  LEFT JOIN sys_document d ON dt.document_id = d.document_id AND d.del_flag = '0'
-                 LEFT JOIN sys_menu m ON m.path = concat('tag-', t.tag_id) AND m.remark = 'AUTO_TAG_MENU'
     </sql>
 
     <select id="selectTagList" parameterType="SysTag" resultMap="SysTagResult">
@@ -41,8 +44,12 @@
             t.del_flag = '0'
             <if test="tagName != null and tagName != ''"> and t.tag_name like concat('%', #{tagName}, '%')</if>
             <if test="ownerUserId != null"> and t.owner_user_id = #{ownerUserId}</if>
+            <if test="documentType != null and documentType != ''"> and t.document_type = #{documentType}</if>
+            <if test="materialCategory != null and materialCategory != ''"> and t.material_category = #{materialCategory}</if>
+            <if test="status != null and status != ''"> and t.status = #{status}</if>
         </where>
-        GROUP BY t.tag_id, t.owner_user_id, t.tag_name, t.tag_key, t.create_by, t.create_time, t.update_time, t.remark, m.status
+        GROUP BY t.tag_id, t.owner_user_id, t.tag_name, t.tag_key, t.document_type, t.material_category,
+                 t.create_by, t.create_time, t.update_time, t.remark, t.status
         ORDER BY t.create_time DESC
     </select>
 
@@ -50,12 +57,17 @@
         <include refid="selectTagVo"/>
         WHERE t.del_flag = '0'
           AND t.tag_id = #{tagId}
-        GROUP BY t.tag_id, t.owner_user_id, t.tag_name, t.tag_key, t.create_by, t.create_time, t.update_time, t.remark, m.status
+        GROUP BY t.tag_id, t.owner_user_id, t.tag_name, t.tag_key, t.document_type, t.material_category,
+                 t.create_by, t.create_time, t.update_time, t.remark, t.status
     </select>
 
     <select id="checkTagUnique" resultMap="SysTagResult">
-        SELECT tag_id, tag_name FROM sys_tag
-        WHERE owner_user_id = #{userId} AND tag_key = #{tagKey}
+        SELECT tag_id, owner_user_id, tag_name, tag_key, document_type, material_category, status
+        FROM sys_tag
+        WHERE document_type = #{documentType}
+          AND tag_key = #{tagKey}
+          AND del_flag = '0'
+          AND ((#{materialCategory} IS NULL AND material_category IS NULL) OR material_category = #{materialCategory})
             LIMIT 1
     </select>
 
@@ -63,12 +75,18 @@
         INSERT INTO sys_tag(
         <if test="ownerUserId != null">owner_user_id,</if>
         <if test="tagName != null">tag_name,</if>
+        <if test="documentType != null">document_type,</if>
+        <if test="materialCategory != null">material_category,</if>
+        <if test="status != null">status,</if>
         <if test="createBy != null">create_by,</if>
         <if test="remark != null">remark,</if>
         create_time
         ) VALUES (
         <if test="ownerUserId != null">#{ownerUserId},</if>
         <if test="tagName != null">#{tagName},</if>
+        <if test="documentType != null">#{documentType},</if>
+        <if test="materialCategory != null">#{materialCategory},</if>
+        <if test="status != null">#{status},</if>
         <if test="createBy != null">#{createBy},</if>
         <if test="remark != null">#{remark},</if>
         sysdate()
@@ -82,6 +100,13 @@
             <if test="remark != null">remark = #{remark},</if>
             update_time = sysdate()
         </set>
+        WHERE tag_id = #{tagId}
+          AND del_flag = '0'
+    </update>
+
+    <update id="updateTagStatus">
+        UPDATE sys_tag
+        SET status = #{status}, update_time = sysdate()
         WHERE tag_id = #{tagId}
           AND del_flag = '0'
     </update>
@@ -106,6 +131,16 @@
         WHERE t.owner_user_id = #{userId}
         GROUP BY t.tag_id, t.tag_name
         ORDER BY COUNT(dt.document_id) DESC
+    </select>
+
+    <select id="selectTagsByScope" resultType="String">
+        SELECT t.tag_name
+        FROM sys_tag t
+        WHERE t.del_flag = '0'
+          AND t.status = '0'
+          AND t.document_type = #{documentType}
+          AND ((#{materialCategory} IS NULL AND t.material_category IS NULL) OR t.material_category = #{materialCategory})
+        ORDER BY t.tag_name
     </select>
 
     <select id="selectUsedDocumentTags" resultMap="SysTagResult">
@@ -137,31 +172,6 @@
         </foreach>
     </select>
 
-    <select id="selectUnusedTagIds" resultType="Long">
-        SELECT t.tag_id
-        FROM sys_tag t
-        WHERE t.del_flag = '0'
-          AND t.tag_id in
-        <foreach item="tagId" collection="tagIds" open="(" separator="," close=")">
-            #{tagId}
-        </foreach>
-          AND NOT EXISTS (
-              SELECT 1
-              FROM sys_document_tag dt
-                       INNER JOIN sys_document d ON dt.document_id = d.document_id
-              WHERE dt.tag_id = t.tag_id
-                AND d.del_flag = '0'
-          )
-    </select>
-
-    <delete id="deleteTagByIds">
-        DELETE FROM sys_tag
-        WHERE tag_id in
-        <foreach item="tagId" collection="tagIds" open="(" separator="," close=")">
-            #{tagId}
-        </foreach>
-    </delete>
-
     <insert id="insertDocTag">
         INSERT INTO sys_document_tag(document_id, tag_id) VALUES (#{documentId}, #{tagId})
     </insert>
@@ -184,6 +194,17 @@
           and tag_name = #{tagName}
           and del_flag = '0'
             limit 1
+    </select>
+
+    <select id="selectTagByNameAndScope" resultType="SysTag">
+        select tag_id as tagId, owner_user_id as ownerUserId, tag_name as tagName, tag_key as tagKey,
+               document_type as documentType, material_category as materialCategory, status
+        from sys_tag
+        where document_type = #{documentType}
+          and tag_name = #{tagName}
+          and del_flag = '0'
+          and ((#{materialCategory} IS NULL AND material_category IS NULL) OR material_category = #{materialCategory})
+        limit 1
     </select>
 
 

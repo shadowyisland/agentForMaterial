@@ -10,10 +10,29 @@ export function listDocument(query) {
 }
 
 // 获取常用标签
-export function getTopTags() {
+export function getTopTags(query) {
   return request({
     url: '/system/document/tags/top',
-    method: 'get'
+    method: 'get',
+    params: query
+  })
+}
+
+// 获取当前分类统计
+export function getDocumentStats(query) {
+  return request({
+    url: '/system/document/stats',
+    method: 'get',
+    params: query
+  })
+}
+
+// 跨分类检索 OCR 正文与使用记录
+export function searchDocument(query) {
+  return request({
+    url: '/system/document/search',
+    method: 'get',
+    params: query
   })
 }
 
@@ -56,6 +75,40 @@ export function ocrDocument(documentId) {
 export function delDocument(documentId) {
   return request({
     url: '/system/document/' + documentId,
+    method: 'delete'
+  })
+}
+
+// 查询文档使用记录
+export function listDocumentRecords(documentId) {
+  return request({
+    url: '/system/document/' + documentId + '/records',
+    method: 'get'
+  })
+}
+
+// 新增文档使用记录
+export function addDocumentRecord(documentId, data) {
+  return request({
+    url: '/system/document/' + documentId + '/records',
+    method: 'post',
+    data
+  })
+}
+
+// 修改本人创建的文档使用记录
+export function updateDocumentRecord(recordId, data) {
+  return request({
+    url: '/system/document/records/' + recordId,
+    method: 'put',
+    data
+  })
+}
+
+// 管理员删除文档使用记录
+export function delDocumentRecord(recordId) {
+  return request({
+    url: '/system/document/records/' + recordId,
     method: 'delete'
   })
 }

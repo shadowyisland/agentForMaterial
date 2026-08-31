@@ -15,6 +15,8 @@
         <result property="filePath"      column="file_path"      />
         <result property="fileOriginName" column="file_origin_name" />
         <result property="fileSuffix"    column="file_suffix"    />
+        <result property="fileSize"      column="file_size"      />
+        <result property="mimeType"      column="mime_type"      />
         <result property="createBy"      column="create_by"      />
         <result property="createTime"    column="create_time"    />
         <result property="remark"        column="remark"         />
@@ -22,23 +24,35 @@
         <result property="ocrContent"    column="ocr_content"    />
         <result property="ocrTime"       column="ocr_time"       />
         <result property="ocrError"      column="ocr_error"      />
+        <result property="documentType"  column="document_type"  />
+        <result property="materialCategory" column="material_category" />
+        <result property="sourceName"    column="source_name"    />
+        <result property="sourceUrl"     column="source_url"     />
+        <result property="publishDate"   column="publish_date"   />
         <result property="status"        column="status"         />
+        <result property="createUserId"  column="create_user_id" />
         <collection property="tags" javaType="java.util.List" ofType="String" select="selectTagsByDocId" column="document_id"/>
     </resultMap>
 
     <sql id="selectDocumentVo">
-        select document_id, document_name, product_name, product_model, internal_code, file_path, file_origin_name, file_suffix, create_by, create_time, remark, is_recognized, ocr_content, ocr_time, ocr_error, status
-        from sys_document
+        select d.document_id, d.document_name, d.product_name, d.product_model, d.internal_code,
+               d.file_path, d.file_origin_name, d.file_suffix, d.file_size, d.mime_type,
+               d.document_type, d.material_category, d.source_name, d.source_url, d.publish_date,
+               d.create_user_id, d.create_by, d.create_time, d.update_by, d.update_time, d.remark,
+               d.is_recognized, d.ocr_content, d.ocr_time, d.ocr_error, d.status
+        from sys_document d
     </sql>
 
     <select id="selectDocumentList" parameterType="SysDocument" resultMap="SysDocumentResult">
         <include refid="selectDocumentVo"/>
         <where>
-            <if test="documentName != null  and documentName != ''"> and document_name like concat('%', #{documentName}, '%')</if>
-            <if test="documentName != null  and documentName != ''"> and document_name like concat('%', #{documentName}, '%')</if>
+            d.del_flag = '0'
+            <if test="documentType != null and documentType != ''"> and d.document_type = #{documentType}</if>
+            <if test="materialCategory != null and materialCategory != ''"> and d.material_category = #{materialCategory}</if>
+            <if test="documentName != null and documentName != ''"> and d.document_name like concat('%', #{documentName}, '%')</if>
 
             <if test="searchTag != null and searchTag != ''">
-                AND document_id IN (
+                AND d.document_id IN (
                 SELECT dt.document_id
                 FROM sys_document_tag dt
                 LEFT JOIN sys_tag t ON dt.tag_id = t.tag_id
@@ -46,21 +60,70 @@
                 )
             </if>
             <if test="exactTag != null and exactTag != ''">
-                AND document_id IN (
+                AND d.document_id IN (
                 SELECT dt.document_id
                 FROM sys_document_tag dt
                 LEFT JOIN sys_tag t ON dt.tag_id = t.tag_id
                 WHERE t.tag_name = #{exactTag}
                 )
             </if>
-            <if test="fileOriginName != null  and fileOriginName != ''"> and file_origin_name like concat('%', #{fileOriginName}, '%')</if>
+            <if test="fileOriginName != null and fileOriginName != ''"> and d.file_origin_name like concat('%', #{fileOriginName}, '%')</if>
         </where>
-        order by create_time desc
+        order by d.create_time desc
+    </select>
+
+    <select id="searchDocumentList" parameterType="SysDocument" resultMap="SysDocumentResult">
+        <include refid="selectDocumentVo"/>
+        <where>
+            d.del_flag = '0'
+            <foreach collection="keywords" item="word">
+                AND
+                <choose>
+                    <when test="searchScope == 'ocr'">
+                        d.ocr_content like concat('%', #{word}, '%') escape '\\'
+                    </when>
+                    <when test="searchScope == 'record'">
+                        exists (
+                            select 1 from sys_document_record r
+                            where r.document_id = d.document_id
+                              and r.del_flag = '0'
+                              and (r.usage_content like concat('%', #{word}, '%') escape '\\'
+                                   or r.remark like concat('%', #{word}, '%') escape '\\')
+                        )
+                    </when>
+                    <otherwise>
+                        (
+                            d.ocr_content like concat('%', #{word}, '%') escape '\\'
+                            or exists (
+                                select 1 from sys_document_record r
+                                where r.document_id = d.document_id
+                                  and r.del_flag = '0'
+                                  and (r.usage_content like concat('%', #{word}, '%') escape '\\'
+                                       or r.remark like concat('%', #{word}, '%') escape '\\')
+                            )
+                        )
+                    </otherwise>
+                </choose>
+            </foreach>
+        </where>
+        order by d.create_time desc
+    </select>
+
+    <select id="selectDocumentStats" parameterType="SysDocument" resultType="java.util.HashMap">
+        select count(*) as total,
+               coalesce(sum(case when is_recognized = 1 then 1 else 0 end), 0) as recognized,
+               coalesce(sum(case when is_recognized = 0 then 1 else 0 end), 0) as pending,
+               coalesce(sum(case when is_recognized = 2 then 1 else 0 end), 0) as failed
+        from sys_document
+        where del_flag = '0'
+        <if test="documentType != null and documentType != ''"> and document_type = #{documentType}</if>
+        <if test="materialCategory != null and materialCategory != ''"> and material_category = #{materialCategory}</if>
     </select>
 
     <select id="selectDocumentById" parameterType="Long" resultMap="SysDocumentResult">
         <include refid="selectDocumentVo"/>
-        where document_id = #{documentId}
+        where d.document_id = #{documentId}
+          and d.del_flag = '0'
     </select>
 
     <update id="updateDocument" parameterType="SysDocument">
@@ -75,6 +138,23 @@
             <if test="filePath != null">file_path = #{filePath},</if>
             <if test="fileOriginName != null">file_origin_name = #{fileOriginName},</if>
             <if test="fileSuffix != null">file_suffix = #{fileSuffix},</if>
+            <if test="fileSize != null">file_size = #{fileSize},</if>
+            <if test="mimeType != null">mime_type = #{mimeType},</if>
+            <if test="documentType != null">document_type = #{documentType},</if>
+            <if test="materialCategory != null">material_category = #{materialCategory},</if>
+            <choose>
+                <when test="documentType == 'EXTERNAL'">
+                    source_name = #{sourceName},
+                    source_url = #{sourceUrl},
+                    publish_date = #{publishDate},
+                </when>
+                <otherwise>
+                    <if test="sourceName != null">source_name = #{sourceName},</if>
+                    <if test="sourceUrl != null">source_url = #{sourceUrl},</if>
+                    <if test="publishDate != null">publish_date = #{publishDate},</if>
+                </otherwise>
+            </choose>
+            <if test="createUserId != null">create_user_id = #{createUserId},</if>
             <if test="remark != null">remark = #{remark},</if>
             <if test="isRecognized != null">is_recognized = #{isRecognized},</if>
             <if test="ocrContent != null">ocr_content = #{ocrContent},</if>
@@ -98,6 +178,14 @@
             <if test="filePath != null">file_path,</if>
             <if test="fileOriginName != null">file_origin_name,</if>
             <if test="fileSuffix != null">file_suffix,</if>
+            <if test="fileSize != null">file_size,</if>
+            <if test="mimeType != null">mime_type,</if>
+            document_type,
+            <if test="materialCategory != null">material_category,</if>
+            <if test="sourceName != null">source_name,</if>
+            <if test="sourceUrl != null">source_url,</if>
+            <if test="publishDate != null">publish_date,</if>
+            <if test="createUserId != null">create_user_id,</if>
             <if test="createBy != null">create_by,</if>
             <if test="createTime != null">create_time,</if>
             <if test="remark != null">remark,</if>
@@ -112,6 +200,14 @@
             <if test="filePath != null">#{filePath},</if>
             <if test="fileOriginName != null">#{fileOriginName},</if>
             <if test="fileSuffix != null">#{fileSuffix},</if>
+            <if test="fileSize != null">#{fileSize},</if>
+            <if test="mimeType != null">#{mimeType},</if>
+            #{documentType},
+            <if test="materialCategory != null">#{materialCategory},</if>
+            <if test="sourceName != null">#{sourceName},</if>
+            <if test="sourceUrl != null">#{sourceUrl},</if>
+            <if test="publishDate != null">#{publishDate},</if>
+            <if test="createUserId != null">#{createUserId},</if>
             <if test="createBy != null">#{createBy},</if>
             <if test="createTime != null">#{createTime},</if>
             <if test="remark != null">#{remark},</if>
@@ -130,5 +226,7 @@
         FROM sys_tag t
                  LEFT JOIN sys_document_tag dt ON t.tag_id = dt.tag_id
         WHERE dt.document_id = #{documentId}
+          AND t.status = '0'
+          AND t.del_flag = '0'
     </select>
 </mapper>

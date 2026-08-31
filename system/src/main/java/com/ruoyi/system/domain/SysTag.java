@@ -20,6 +20,12 @@ public class SysTag extends BaseEntity
 
     private String tagKey;
 
+    /** 文档类型：INTERNAL / EXTERNAL */
+    private String documentType;
+
+    /** 内部材料分类，外部文档为空 */
+    private String materialCategory;
+
     private Long documentCount;
 
     private List<String> documentNames;
@@ -63,6 +69,26 @@ public class SysTag extends BaseEntity
         return tagKey;
     }
 
+    public String getDocumentType()
+    {
+        return documentType;
+    }
+
+    public void setDocumentType(String documentType)
+    {
+        this.documentType = documentType;
+    }
+
+    public String getMaterialCategory()
+    {
+        return materialCategory;
+    }
+
+    public void setMaterialCategory(String materialCategory)
+    {
+        this.materialCategory = materialCategory;
+    }
+
     public Long getDocumentCount()
     {
         return documentCount;
@@ -100,6 +126,8 @@ public class SysTag extends BaseEntity
                 .append("ownerUserId", getOwnerUserId())
                 .append("tagName", getTagName())
                 .append("tagKey", getTagKey())
+                .append("documentType", getDocumentType())
+                .append("materialCategory", getMaterialCategory())
                 .append("documentCount", getDocumentCount())
                 .append("documentNames", getDocumentNames())
                 .append("status", getStatus())

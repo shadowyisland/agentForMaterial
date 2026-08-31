@@ -11,6 +11,8 @@ body {
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
   font-family: Helvetica Neue, Helvetica, PingFang SC, Hiragino Sans GB, Microsoft YaHei, Arial, sans-serif;
+  color: #263d54;
+  background: #f3f7fb;
 }
 
 label {
@@ -122,6 +124,54 @@ aside {
 //main-container全局样式
 .app-container {
   padding: 20px;
+}
+
+// 材料科技蓝：统一常用控件的圆角、层次与交互色。
+.el-button {
+  border-radius: 7px;
+}
+
+.el-button--primary {
+  border-color: #1675d1;
+  background: #1675d1;
+
+  &:hover,
+  &:focus {
+    border-color: #0f64b9;
+    background: #0f64b9;
+  }
+}
+
+.el-input__inner,
+.el-textarea__inner,
+.el-select .el-input__inner {
+  border-color: #d7e3ef;
+  border-radius: 7px;
+}
+
+.el-table {
+  color: #385067;
+
+  th.el-table__cell {
+    color: #50677e;
+    font-weight: 600;
+    background: #f5f8fc;
+  }
+
+  td.el-table__cell,
+  th.el-table__cell {
+    border-bottom-color: #e8eef5;
+  }
+}
+
+.el-dialog,
+.el-drawer {
+  border-radius: 12px;
+}
+
+.el-dialog__header,
+.el-drawer__header {
+  border-bottom: 1px solid #e7eef6;
 }
 
 .components-container {

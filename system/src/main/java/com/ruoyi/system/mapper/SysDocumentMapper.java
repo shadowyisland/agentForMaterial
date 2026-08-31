@@ -1,6 +1,7 @@
 package com.ruoyi.system.mapper;
 
 import java.util.List;
+import java.util.Map;
 import com.ruoyi.system.domain.SysDocument;
 
 public interface SysDocumentMapper
@@ -18,6 +19,12 @@ public interface SysDocumentMapper
      * @return 文档集合
      */
     public List<SysDocument> selectDocumentList(SysDocument document);
+
+    /** 跨类型检索OCR正文和使用记录。 */
+    public List<SysDocument> searchDocumentList(SysDocument document);
+
+    /** 查询当前类型/分类统计。 */
+    public Map<String, Object> selectDocumentStats(SysDocument document);
 
     /**
      * 新增文档

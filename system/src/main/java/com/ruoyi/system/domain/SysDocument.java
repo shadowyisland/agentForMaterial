@@ -3,6 +3,7 @@ package com.ruoyi.system.domain;
 import java.util.Date;
 import java.util.List;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import org.apache.commons.lang3.builder.ToStringBuilder;
 import org.apache.commons.lang3.builder.ToStringStyle;
 import com.ruoyi.common.annotation.Excel;
@@ -65,13 +66,46 @@ public class SysDocument extends BaseEntity {
     /** OCR失败原因 */
     private String ocrError;
 
+    /** 文档类型：INTERNAL / EXTERNAL */
+    private String documentType;
+
+    /** 内部材料分类 */
+    private String materialCategory;
+
+    /** 外部文档来源单位或网站 */
+    private String sourceName;
+
+    /** 外部文档原始链接 */
+    private String sourceUrl;
+
+    /** 外部文档发布日期 */
+    private Date publishDate;
+
     /** 状态 */
     @Excel(name = "状态")
     private String status;
 
+    /** 上传者用户ID */
+    private Long createUserId;
+
     private String searchTag;
 
     private String exactTag;
+
+    /** 全局检索关键词（空格分词） */
+    private String keyword;
+
+    /** 检索范围：all / ocr / record */
+    private String searchScope;
+
+    /** 已转义的检索词，仅供Mapper使用 */
+    @JsonIgnore
+    private List<String> keywords;
+
+    /** 命中来源与摘要（非数据库字段） */
+    private String matchSource;
+
+    private String matchSnippet;
 
     /** 标签列表（非数据库字段，用于接收前端传参） */
     private List<String> tags;
@@ -192,6 +226,54 @@ public class SysDocument extends BaseEntity {
         return status;
     }
 
+    public Long getCreateUserId() {
+        return createUserId;
+    }
+
+    public void setCreateUserId(Long createUserId) {
+        this.createUserId = createUserId;
+    }
+
+    public String getDocumentType() {
+        return documentType;
+    }
+
+    public void setDocumentType(String documentType) {
+        this.documentType = documentType;
+    }
+
+    public String getMaterialCategory() {
+        return materialCategory;
+    }
+
+    public void setMaterialCategory(String materialCategory) {
+        this.materialCategory = materialCategory;
+    }
+
+    public String getSourceName() {
+        return sourceName;
+    }
+
+    public void setSourceName(String sourceName) {
+        this.sourceName = sourceName;
+    }
+
+    public String getSourceUrl() {
+        return sourceUrl;
+    }
+
+    public void setSourceUrl(String sourceUrl) {
+        this.sourceUrl = sourceUrl;
+    }
+
+    public Date getPublishDate() {
+        return publishDate;
+    }
+
+    public void setPublishDate(Date publishDate) {
+        this.publishDate = publishDate;
+    }
+
     public void setStatus(String status) {
         this.status = status;
     }
@@ -210,6 +292,46 @@ public class SysDocument extends BaseEntity {
 
     public void setExactTag(String exactTag) {
         this.exactTag = exactTag;
+    }
+
+    public String getKeyword() {
+        return keyword;
+    }
+
+    public void setKeyword(String keyword) {
+        this.keyword = keyword;
+    }
+
+    public String getSearchScope() {
+        return searchScope;
+    }
+
+    public void setSearchScope(String searchScope) {
+        this.searchScope = searchScope;
+    }
+
+    public List<String> getKeywords() {
+        return keywords;
+    }
+
+    public void setKeywords(List<String> keywords) {
+        this.keywords = keywords;
+    }
+
+    public String getMatchSource() {
+        return matchSource;
+    }
+
+    public void setMatchSource(String matchSource) {
+        this.matchSource = matchSource;
+    }
+
+    public String getMatchSnippet() {
+        return matchSnippet;
+    }
+
+    public void setMatchSnippet(String matchSnippet) {
+        this.matchSnippet = matchSnippet;
     }
 
     public List<String> getTags() {
@@ -235,7 +357,13 @@ public class SysDocument extends BaseEntity {
                 .append("mimeType", getMimeType())
                 .append("ocrContent", getOcrContent())
                 .append("isRecognized", getIsRecognized())
+                .append("documentType", getDocumentType())
+                .append("materialCategory", getMaterialCategory())
+                .append("sourceName", getSourceName())
+                .append("sourceUrl", getSourceUrl())
+                .append("publishDate", getPublishDate())
                 .append("status", getStatus())
+                .append("createUserId", getCreateUserId())
                 .append("createBy", getCreateBy())
                 .append("createTime", getCreateTime())
                 .append("updateBy", getUpdateBy())

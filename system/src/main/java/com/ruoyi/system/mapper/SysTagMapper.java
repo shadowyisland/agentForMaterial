@@ -23,7 +23,9 @@ public interface SysTagMapper
     /**
      * 检查标签是否存在
      */
-    public SysTag checkTagUnique(@Param("userId") Long userId, @Param("tagKey") String tagKey);
+    public SysTag checkTagUnique(@Param("documentType") String documentType,
+                                 @Param("materialCategory") String materialCategory,
+                                 @Param("tagKey") String tagKey);
 
     /**
      * 新增标签
@@ -34,6 +36,9 @@ public interface SysTagMapper
      * 修改标签
      */
     public int updateTag(SysTag sysTag);
+
+    /** 修改标签启停状态。 */
+    public int updateTagStatus(@Param("tagId") Long tagId, @Param("status") String status);
 
     /**
      * 根据标签ID删除标签
@@ -50,6 +55,10 @@ public interface SysTagMapper
      */
     public List<String> selectTagsByUserId(Long userId);
 
+    /** 获取指定文档范围内启用的标签。 */
+    public List<String> selectTagsByScope(@Param("documentType") String documentType,
+                                          @Param("materialCategory") String materialCategory);
+
     /**
      * 获取已有文档关联的标签
      */
@@ -64,16 +73,6 @@ public interface SysTagMapper
      * 查询多个文档关联的标签ID
      */
     public List<Long> selectTagIdsByDocumentIds(Long[] documentIds);
-
-    /**
-     * 查询已无有效文档关联的标签ID
-     */
-    public List<Long> selectUnusedTagIds(@Param("tagIds") List<Long> tagIds);
-
-    /**
-     * 批量删除标签
-     */
-    public int deleteTagByIds(@Param("tagIds") List<Long> tagIds);
 
     /**
      * 关联文档和标签
@@ -92,6 +91,11 @@ public interface SysTagMapper
 
     /** 查询用户私有同名标签 */
     SysTag selectTagByNameAndUserId(@Param("tagName") String tagName, @Param("userId") Long userId);
+
+    /** 查询指定文档范围内的同名共享标签。 */
+    SysTag selectTagByNameAndScope(@Param("tagName") String tagName,
+                                   @Param("documentType") String documentType,
+                                   @Param("materialCategory") String materialCategory);
 
 
     /** 检查文档与某标签是否已有绑定 */

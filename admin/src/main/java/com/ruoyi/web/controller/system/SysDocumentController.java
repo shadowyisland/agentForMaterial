@@ -1,10 +1,9 @@
 package com.ruoyi.web.controller.system;
 
-// 请在文件头部补充导入 DTO
 import com.ruoyi.system.domain.dto.DocumentTagDto;
-// 补充 StringUtils 的导入
 import com.ruoyi.common.utils.StringUtils;
 import java.util.List;
+import java.util.Map;
 import javax.servlet.http.HttpServletResponse;
 import com.ruoyi.system.mapper.SysTagMapper;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -16,6 +15,7 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import com.ruoyi.common.annotation.Log;
 import com.ruoyi.common.core.controller.BaseController;
@@ -44,9 +44,10 @@ public class SysDocumentController extends BaseController
      */
     @PreAuthorize("@ss.hasPermi('system:document:list')")
     @GetMapping("/tags/top")
-    public AjaxResult getTopTags()
+    public AjaxResult getTopTags(@RequestParam String documentType,
+                                 @RequestParam(required = false) String materialCategory)
     {
-        List<String> list = sysTagMapper.selectTagsByUserId(getUserId());
+        List<String> list = sysTagMapper.selectTagsByScope(documentType, materialCategory);
         return success(list);
     }
 
@@ -60,6 +61,29 @@ public class SysDocumentController extends BaseController
         startPage();
         List<SysDocument> list = sysDocumentService.selectDocumentList(sysDocument);
         return getDataTable(list);
+    }
+
+    /**
+     * 跨内部/外部文档检索OCR正文与使用记录。
+     */
+    @PreAuthorize("@ss.hasPermi('system:document:search')")
+    @GetMapping("/search")
+    public TableDataInfo search(SysDocument sysDocument)
+    {
+        startPage();
+        List<SysDocument> list = sysDocumentService.searchDocumentList(sysDocument);
+        return getDataTable(list);
+    }
+
+    /**
+     * 获取当前文档类型/分类统计。
+     */
+    @PreAuthorize("@ss.hasPermi('system:document:list')")
+    @GetMapping("/stats")
+    public AjaxResult stats(SysDocument sysDocument)
+    {
+        Map<String, Object> stats = sysDocumentService.selectDocumentStats(sysDocument);
+        return success(stats);
     }
 
     /**
