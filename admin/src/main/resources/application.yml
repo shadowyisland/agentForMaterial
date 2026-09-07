@@ -140,6 +140,22 @@ baidu:
     key: ${BAIDU_API_KEY:}
     secret: ${BAIDU_API_SECRET:}
 
+file:
+  parse:
+    api:
+      url: http://127.0.0.1:8001
+      connectTimeout: 30000
+      responseTimeout: 300000
+
+llm:
+  qwen:
+    base-url: http://202.127.200.35:8081/v1
+    model: qwen3.8-27b
+    connect-timeout: 30000
+    response-timeout: 300000
+    temperature: 0
+    max-tokens: 262144
+
 aliyun:
   oss:
     file:

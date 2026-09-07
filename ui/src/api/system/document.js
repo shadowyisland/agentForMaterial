@@ -1,5 +1,39 @@
 import request from '@/utils/request'
 
+export function getTemplatePreviewInfo(documentId) {
+  return request({
+    url: '/system/document/' + documentId + '/preview/template/info',
+    method: 'get'
+  })
+}
+
+export function previewDocumentTemplate(documentId, page) {
+  return request({
+    url: '/system/document/' + documentId + '/preview/template',
+    method: 'get',
+    params: { page },
+    responseType: 'blob',
+    timeout: 60000
+  })
+}
+
+export function getUploadPreviewInfo(documentId) {
+  return request({
+    url: '/system/document/' + documentId + '/preview/upload/info',
+    method: 'get'
+  })
+}
+
+export function previewUploadedPage(documentId, page) {
+  return request({
+    url: '/system/document/' + documentId + '/preview/upload',
+    method: 'get',
+    params: { page },
+    responseType: 'blob',
+    timeout: 60000
+  })
+}
+
 // 查询文档管理列表
 export function listDocument(query) {
   return request({
@@ -49,7 +83,8 @@ export function addDocument(data) {
   return request({
     url: '/system/document',
     method: 'post',
-    data: data
+    data: data,
+    timeout: 360000
   })
 }
 
@@ -68,6 +103,44 @@ export function ocrDocument(documentId) {
     url: '/system/document/ocr/' + documentId,
     method: 'post',
     timeout: 100000,
+  })
+}
+
+// 获取文档最新 AI 解析结果
+export function getLatestExtract(documentId) {
+  return request({
+    url: '/system/document/' + documentId + '/extract/latest',
+    method: 'get',
+    timeout: 300000
+  })
+}
+
+// 手动重新执行 AI 抽取
+export function extractDocument(documentId) {
+  return request({
+    url: '/system/document/' + documentId + '/extract',
+    method: 'post',
+    timeout: 300000
+  })
+}
+
+// 保存用户修订后的 JSON
+export function saveExtractFinal(documentId, extractId, finalJson) {
+  return request({
+    url: '/system/document/' + documentId + '/extract/' + extractId + '/final',
+    method: 'put',
+    data: { finalJson: finalJson }
+  })
+}
+
+// 保存最终 JSON 并下载回填后的 Word
+export function downloadExtract(documentId, extractId, finalJson) {
+  return request({
+    url: '/system/document/' + documentId + '/extract/' + extractId + '/download',
+    method: 'post',
+    data: { finalJson: finalJson },
+    responseType: 'blob',
+    timeout: 300000
   })
 }
 

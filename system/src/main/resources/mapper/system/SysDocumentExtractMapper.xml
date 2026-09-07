@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.system.mapper.SysDocumentExtractMapper">
+
+    <resultMap type="SysDocumentExtract" id="DocumentExtractResult">
+        <id property="extractId" column="extract_id"/>
+        <result property="documentId" column="document_id"/>
+        <result property="materialType" column="material_type"/>
+        <result property="modelName" column="model_name"/>
+        <result property="promptVersion" column="prompt_version"/>
+        <result property="aiJson" column="ai_json"/>
+        <result property="finalJson" column="final_json"/>
+        <result property="status" column="status"/>
+        <result property="createBy" column="create_by"/>
+        <result property="createTime" column="create_time"/>
+        <result property="updateBy" column="update_by"/>
+        <result property="updateTime" column="update_time"/>
+        <result property="remark" column="remark"/>
+    </resultMap>
+
+    <sql id="extractTable">
+        <choose>
+            <when test="documentKind == 'TDS'">sys_document_tds_extract</when>
+            <when test="documentKind == 'MSDS'">sys_document_msds_extract</when>
+            <otherwise>sys_document_tds_extract</otherwise>
+        </choose>
+    </sql>
+
+    <insert id="insertExtract" parameterType="SysDocumentExtract" useGeneratedKeys="true" keyProperty="extractId">
+        insert into <include refid="extractTable"/>
+        (document_id, material_type, model_name, prompt_version, ai_json, final_json, status, create_by, create_time, remark)
+        values (#{documentId}, #{materialType}, #{modelName}, #{promptVersion}, #{aiJson}, #{finalJson}, #{status}, #{createBy}, #{createTime}, #{remark})
+    </insert>
+
+    <select id="selectLatestByDocumentId" resultMap="DocumentExtractResult">
+        select extract_id, document_id, material_type, model_name, prompt_version, ai_json, final_json, status,
+               create_by, create_time, update_by, update_time, remark
+        from <include refid="extractTable"/>
+        where document_id = #{documentId}
+        order by extract_id desc
+        limit 1
+    </select>
+
+    <select id="selectById" resultMap="DocumentExtractResult">
+        select extract_id, document_id, material_type, model_name, prompt_version, ai_json, final_json, status,
+               create_by, create_time, update_by, update_time, remark
+        from <include refid="extractTable"/>
+        where document_id = #{documentId}
+          and extract_id = #{extractId}
+        limit 1
+    </select>
+
+    <update id="updateFinalJson" parameterType="SysDocumentExtract">
+        update <include refid="extractTable"/>
+        set final_json = #{finalJson}, status = #{status}, update_by = #{updateBy}, update_time = #{updateTime}
+        where document_id = #{documentId}
+          and extract_id = #{extractId}
+    </update>
+
+    <delete id="deleteTdsByDocumentIds">
+        delete from sys_document_tds_extract where document_id in
+        <foreach collection="documentIds" item="documentId" open="(" separator="," close=")">
+            #{documentId}
+        </foreach>
+    </delete>
+
+    <delete id="deleteMsdsByDocumentIds">
+        delete from sys_document_msds_extract where document_id in
+        <foreach collection="documentIds" item="documentId" open="(" separator="," close=")">
+            #{documentId}
+        </foreach>
+    </delete>
+</mapper>

@@ -26,6 +26,7 @@
         <result property="ocrError"      column="ocr_error"      />
         <result property="documentType"  column="document_type"  />
         <result property="materialCategory" column="material_category" />
+        <result property="documentKind" column="document_kind" />
         <result property="sourceName"    column="source_name"    />
         <result property="sourceUrl"     column="source_url"     />
         <result property="publishDate"   column="publish_date"   />
@@ -37,7 +38,7 @@
     <sql id="selectDocumentVo">
         select d.document_id, d.document_name, d.product_name, d.product_model, d.internal_code,
                d.file_path, d.file_origin_name, d.file_suffix, d.file_size, d.mime_type,
-               d.document_type, d.material_category, d.source_name, d.source_url, d.publish_date,
+               d.document_type, d.material_category, d.document_kind, d.source_name, d.source_url, d.publish_date,
                d.create_user_id, d.create_by, d.create_time, d.update_by, d.update_time, d.remark,
                d.is_recognized, d.ocr_content, d.ocr_time, d.ocr_error, d.status
         from sys_document d
@@ -142,6 +143,7 @@
             <if test="mimeType != null">mime_type = #{mimeType},</if>
             <if test="documentType != null">document_type = #{documentType},</if>
             <if test="materialCategory != null">material_category = #{materialCategory},</if>
+            <if test="documentKind != null">document_kind = #{documentKind},</if>
             <choose>
                 <when test="documentType == 'EXTERNAL'">
                     source_name = #{sourceName},
@@ -182,6 +184,7 @@
             <if test="mimeType != null">mime_type,</if>
             document_type,
             <if test="materialCategory != null">material_category,</if>
+            <if test="documentKind != null">document_kind,</if>
             <if test="sourceName != null">source_name,</if>
             <if test="sourceUrl != null">source_url,</if>
             <if test="publishDate != null">publish_date,</if>
@@ -204,6 +207,7 @@
             <if test="mimeType != null">#{mimeType},</if>
             #{documentType},
             <if test="materialCategory != null">#{materialCategory},</if>
+            <if test="documentKind != null">#{documentKind},</if>
             <if test="sourceName != null">#{sourceName},</if>
             <if test="sourceUrl != null">#{sourceUrl},</if>
             <if test="publishDate != null">#{publishDate},</if>

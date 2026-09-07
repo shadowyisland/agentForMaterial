@@ -1,8 +1,6 @@
 package com.ruoyi.system.service.impl;
 
-import java.awt.image.BufferedImage;
 import java.io.File;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -10,19 +8,15 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-import javax.imageio.ImageIO;
-
-import org.apache.pdfbox.pdmodel.PDDocument;
-import org.apache.pdfbox.rendering.ImageType;
-import org.apache.pdfbox.rendering.PDFRenderer;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.ruoyi.common.config.RuoYiConfig;
 import com.ruoyi.common.constant.Constants;
 import com.ruoyi.common.exception.ServiceException;
-import com.ruoyi.common.ocr.BaiduOcrService;
 import com.ruoyi.common.utils.DateUtils;
 import com.ruoyi.common.utils.SecurityUtils;
 import com.ruoyi.common.utils.StringUtils;
@@ -35,6 +29,7 @@ import com.ruoyi.system.mapper.SysDocumentMapper;
 import com.ruoyi.system.mapper.SysDocumentRecordMapper;
 import com.ruoyi.system.mapper.SysTagMapper;
 import com.ruoyi.system.service.ISysDocumentService;
+import com.ruoyi.system.service.DocumentExtractService;
 
 /**
  * 文档管理Service业务层处理
@@ -42,18 +37,22 @@ import com.ruoyi.system.service.ISysDocumentService;
 @Service
 public class SysDocumentServiceImpl implements ISysDocumentService {
 
+    private static final Logger log = LoggerFactory.getLogger(SysDocumentServiceImpl.class);
+
     @Autowired
     private SysDocumentMapper documentMapper;
 
-    // 注入百度OCR服务
     @Autowired
-    private BaiduOcrService baiduOcrService;
+    private MinerUParseService minerUParseService;
 
     @Autowired
     private SysTagMapper sysTagMapper; // 引入标签Mapper
 
     @Autowired
     private SysDocumentRecordMapper recordMapper;
+
+    @Autowired
+    private DocumentExtractService documentExtractService;
 
     @Override
     public SysDocument selectDocumentById(Long documentId) {
@@ -178,6 +177,9 @@ public class SysDocumentServiceImpl implements ISysDocumentService {
         if (document.getTags() != null && !document.getTags().isEmpty()) {
             insertTags(document.getTags(), document, document.getCreateBy());
         }
+
+        // 文档和标签先落库，OCR/AI 失败不影响上传本身。
+        autoParseAndExtract(document.getDocumentId());
         return rows;
     }
 
@@ -194,6 +196,7 @@ public class SysDocumentServiceImpl implements ISysDocumentService {
         // 文档所属范围由上传入口确定，普通编辑不能跨分类移动。
         document.setDocumentType(current.getDocumentType());
         document.setMaterialCategory(current.getMaterialCategory());
+        normalizeDocumentKind(document);
         if (DocumentConstants.TYPE_INTERNAL.equals(current.getDocumentType())) {
             document.setSourceName("");
             document.setSourceUrl("");
@@ -266,6 +269,7 @@ public class SysDocumentServiceImpl implements ISysDocumentService {
             }
         }
         sysTagMapper.deleteDocTagByDocIds(documentIds);
+        documentExtractService.deleteByDocumentIds(documentIds);
         int rows = documentMapper.deleteDocumentByIds(documentIds);
         deleteLocalFiles(documents);
         return rows;
@@ -307,17 +311,15 @@ public class SysDocumentServiceImpl implements ISysDocumentService {
             throw new ServiceException("文件不存在: " + localPath);
         }
 
-        String resultContent = "";
-
         try {
-            // 2. 判断是否为 PDF
-            if (localPath.toLowerCase().endsWith(".pdf")) {
-                // 如果是 PDF，调用 PDF 处理逻辑
-                resultContent = processPdfAndOcr(file);
-            } else {
-                // 如果是普通图片，直接调用 OCR
-                resultContent = baiduOcrService.recognizeGeneral(localPath);
-            }
+            String resultContent = minerUParseService.parseToMarkdown(localPath, doc.getFileOriginName());
+            // 3. 更新数据库
+            doc.setIsRecognized(1);
+            doc.setOcrContent(resultContent);
+            doc.setOcrTime(DateUtils.getNowDate());
+            doc.setOcrError("");
+
+            return documentMapper.updateDocument(doc);
         } catch (Exception e) {
             doc.setIsRecognized(2);
             doc.setOcrError(StringUtils.substring(e.getMessage(), 0, 500));
@@ -325,66 +327,6 @@ public class SysDocumentServiceImpl implements ISysDocumentService {
             documentMapper.updateDocument(doc);
             throw new ServiceException("识别过程中发生错误: " + e.getMessage());
         }
-
-        // 3. 更新数据库
-        doc.setIsRecognized(1);
-        doc.setOcrContent(resultContent);
-        doc.setOcrTime(DateUtils.getNowDate());
-        doc.setOcrError("");
-
-        return documentMapper.updateDocument(doc);
-    }
-
-    /**
-     * 辅助方法：处理 PDF 文件 (拆分 -> 转图 -> 识别 -> 拼接)
-     */
-    private String processPdfAndOcr(File pdfFile) throws IOException {
-        StringBuilder fullText = new StringBuilder();
-        PDDocument document = null;
-
-        try {
-            // 加载 PDF
-            document = PDDocument.load(pdfFile);
-            PDFRenderer pdfRenderer = new PDFRenderer(document);
-            int pageCount = document.getNumberOfPages();
-
-            // 限制最大页数，防止 PDF 过大导致超时 (可选)
-            if (pageCount > 20) {
-                fullText.append("[警告] PDF页数过多(").append(pageCount).append(")，仅识别前 20 页...\n\n");
-                pageCount = 20;
-            }
-
-            // 循环处理每一页
-            for (int i = 0; i < pageCount; i++) {
-                // 1. 将 PDF 页渲染为图片 (300 DPI 清晰度较高，适合 OCR)
-                BufferedImage bim = pdfRenderer.renderImageWithDPI(i, 300, ImageType.RGB);
-
-                // 2. 创建临时文件保存图片
-                File tempFile = File.createTempFile("ocr_temp_page_" + i, ".jpg");
-                try {
-                    ImageIO.write(bim, "jpg", tempFile);
-
-                    // 3. 调用 OCR 识别该临时图片
-                    String pageResult = baiduOcrService.recognizeGeneral(tempFile.getAbsolutePath());
-
-                    // 4. 拼接结果
-                    fullText.append("=== 第 ").append(i + 1).append(" 页 ===\n");
-                    fullText.append(pageResult).append("\n\n");
-                } finally {
-                    // OCR 调用异常时也必须清理系统临时目录中的图片
-                    FileUtils.deleteFile(tempFile.getAbsolutePath());
-                }
-            }
-        } catch (Exception e) {
-            fullText.append("PDF 解析失败: ").append(e.getMessage());
-            throw e;
-        } finally {
-            if (document != null) {
-                document.close();
-            }
-        }
-
-        return fullText.toString();
     }
 
     private void normalizeQueryScope(SysDocument document) {
@@ -427,6 +369,28 @@ public class SysDocumentServiceImpl implements ISysDocumentService {
             document.setMaterialCategory(null);
         } else {
             throw new ServiceException("文档类型不正确");
+        }
+        normalizeDocumentKind(document);
+    }
+
+    private void normalizeDocumentKind(SysDocument document) {
+        if (StringUtils.isEmpty(document.getDocumentKind())) {
+            return;
+        }
+        String documentKind = document.getDocumentKind().toUpperCase(Locale.ROOT);
+        if (!DocumentConstants.DOCUMENT_KINDS.contains(documentKind)) {
+            throw new ServiceException("资料类型仅支持 TDS 或 MSDS");
+        }
+        document.setDocumentKind(documentKind);
+    }
+
+    private void autoParseAndExtract(Long documentId) {
+        try {
+            ocrDocument(documentId);
+            documentExtractService.extractDocument(documentId);
+        } catch (Exception e) {
+            // OCR 或提示词未配置时，文档仍应保留在管理列表中。
+            log.warn("文档自动解析未完成，documentId: {}, 原因: {}", documentId, e.getMessage());
         }
     }
 

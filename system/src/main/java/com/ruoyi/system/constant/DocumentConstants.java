@@ -15,6 +15,9 @@ public final class DocumentConstants
 
     public static final String CATEGORY_RAW_MATERIAL = "RAW_MATERIAL";
 
+    public static final String KIND_TDS = "TDS";
+    public static final String KIND_MSDS = "MSDS";
+
     public static final String SEARCH_ALL = "all";
     public static final String SEARCH_OCR = "ocr";
     public static final String SEARCH_RECORD = "record";
@@ -27,6 +30,11 @@ public final class DocumentConstants
             "FILLER",
             "SILICONE",
             "ADDITIVE"
+    )));
+
+    public static final Set<String> DOCUMENT_KINDS = Collections.unmodifiableSet(new HashSet<String>(Arrays.asList(
+            KIND_TDS,
+            KIND_MSDS
     )));
 
     private DocumentConstants()

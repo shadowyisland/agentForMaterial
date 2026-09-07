@@ -72,6 +72,9 @@ public class SysDocument extends BaseEntity {
     /** 内部材料分类 */
     private String materialCategory;
 
+    /** 文档资料类型：TDS / MSDS */
+    private String documentKind;
+
     /** 外部文档来源单位或网站 */
     private String sourceName;
 
@@ -250,6 +253,14 @@ public class SysDocument extends BaseEntity {
         this.materialCategory = materialCategory;
     }
 
+    public String getDocumentKind() {
+        return documentKind;
+    }
+
+    public void setDocumentKind(String documentKind) {
+        this.documentKind = documentKind;
+    }
+
     public String getSourceName() {
         return sourceName;
     }
@@ -359,6 +370,7 @@ public class SysDocument extends BaseEntity {
                 .append("isRecognized", getIsRecognized())
                 .append("documentType", getDocumentType())
                 .append("materialCategory", getMaterialCategory())
+                .append("documentKind", getDocumentKind())
                 .append("sourceName", getSourceName())
                 .append("sourceUrl", getSourceUrl())
                 .append("publishDate", getPublishDate())

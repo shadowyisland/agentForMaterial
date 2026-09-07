@@ -1,6 +1,12 @@
 package com.ruoyi.web.controller.system;
 
 import com.ruoyi.system.domain.dto.DocumentTagDto;
+import com.ruoyi.system.domain.SysDocumentExtract;
+import com.ruoyi.system.service.DocumentExtractService;
+import com.ruoyi.system.service.DocumentPreviewService;
+import com.ruoyi.system.service.DocumentTemplateResolver;
+import com.ruoyi.common.exception.ServiceException;
+import com.ruoyi.common.utils.file.FileUtils;
 import com.ruoyi.common.utils.StringUtils;
 import java.util.List;
 import java.util.Map;
@@ -38,6 +44,64 @@ public class SysDocumentController extends BaseController
 
     @Autowired
     private SysTagMapper sysTagMapper;
+
+    @Autowired
+    private DocumentExtractService documentExtractService;
+
+    @Autowired
+    private DocumentPreviewService documentPreviewService;
+
+    @Autowired
+    private DocumentTemplateResolver documentTemplateResolver;
+
+    @PreAuthorize("@ss.hasPermi('system:document:extract:query')")
+    @GetMapping("/{documentId}/preview/template")
+    public void previewTemplate(@PathVariable Long documentId,
+                                @RequestParam(defaultValue = "1") int page,
+                                HttpServletResponse response) throws Exception
+    {
+        SysDocument document = previewDocument(documentId);
+        response.setContentType("image/png");
+        documentPreviewService.writeTemplatePage(documentTemplateResolver
+                .resolvePreview(document.getMaterialCategory(), document.getDocumentKind()), page, response.getOutputStream());
+    }
+
+    @PreAuthorize("@ss.hasPermi('system:document:extract:query')")
+    @GetMapping("/{documentId}/preview/template/info")
+    public AjaxResult templatePreviewInfo(@PathVariable Long documentId) throws Exception
+    {
+        SysDocument document = previewDocument(documentId);
+        return success(documentPreviewService.getTemplateInfo(documentTemplateResolver
+                .resolvePreview(document.getMaterialCategory(), document.getDocumentKind())));
+    }
+
+    @PreAuthorize("@ss.hasPermi('system:document:extract:query')")
+    @GetMapping("/{documentId}/preview/upload/info")
+    public AjaxResult uploadPreviewInfo(@PathVariable Long documentId) throws Exception
+    {
+        return success(documentPreviewService.getUploadInfo(previewDocument(documentId)));
+    }
+
+    @PreAuthorize("@ss.hasPermi('system:document:extract:query')")
+    @GetMapping("/{documentId}/preview/upload")
+    public void previewUpload(@PathVariable Long documentId,
+                              @RequestParam(defaultValue = "1") int page,
+                              HttpServletResponse response) throws Exception
+    {
+        SysDocument document = previewDocument(documentId);
+        response.setContentType("image/png");
+        documentPreviewService.writeUploadPage(document, page, response.getOutputStream());
+    }
+
+    private SysDocument previewDocument(Long documentId)
+    {
+        SysDocument document = sysDocumentService.selectDocumentById(documentId);
+        if (document == null)
+        {
+            throw new ServiceException("文档不存在");
+        }
+        return document;
+    }
 
     /**
      * 获取常用标签列表（Top）
@@ -118,7 +182,8 @@ public class SysDocumentController extends BaseController
     public AjaxResult add(@RequestBody SysDocument sysDocument)
     {
         sysDocument.setCreateBy(getUsername());
-        return toAjax(sysDocumentService.insertDocument(sysDocument));
+        int rows = sysDocumentService.insertDocument(sysDocument);
+        return rows > 0 ? AjaxResult.success(sysDocument.getDocumentId()) : AjaxResult.error("新增文档失败");
     }
 
     /**
@@ -130,6 +195,64 @@ public class SysDocumentController extends BaseController
     public AjaxResult ocr(@PathVariable("documentId") Long documentId)
     {
         return toAjax(sysDocumentService.ocrDocument(documentId));
+    }
+
+    /**
+     * 手动重新执行 AI 抽取。
+     */
+    @PreAuthorize("@ss.hasPermi('system:document:extract')")
+    @Log(title = "文档 AI 抽取", businessType = BusinessType.UPDATE)
+    @PostMapping("/{documentId}/extract")
+    public AjaxResult extract(@PathVariable("documentId") Long documentId)
+    {
+        return success(documentExtractService.extractDocument(documentId));
+    }
+
+    /**
+     * 获取文档最新的 AI 抽取结果。
+     */
+    @PreAuthorize("@ss.hasPermi('system:document:extract:query')")
+    @GetMapping("/{documentId}/extract/latest")
+    public AjaxResult latestExtract(@PathVariable("documentId") Long documentId)
+    {
+        return success(documentExtractService.selectLatest(documentId));
+    }
+
+    /**
+     * 保存用户修改后的抽取 JSON。
+     */
+    @PreAuthorize("@ss.hasPermi('system:document:extract:edit')")
+    @Log(title = "文档解析结果", businessType = BusinessType.UPDATE)
+    @PutMapping("/{documentId}/extract/{extractId}/final")
+    public AjaxResult saveExtractFinal(@PathVariable("documentId") Long documentId,
+                                       @PathVariable("extractId") Long extractId,
+                                       @RequestBody SysDocumentExtract extract)
+    {
+        return toAjax(documentExtractService.saveFinalJson(documentId, extractId, extract.getFinalJson(), false));
+    }
+
+    /**
+     * 保存最终 JSON 并下载回填后的 TDS Word。
+     */
+    @PreAuthorize("@ss.hasPermi('system:document:extract:download')")
+    @Log(title = "文档解析结果下载", businessType = BusinessType.EXPORT)
+    @PostMapping("/{documentId}/extract/{extractId}/download")
+    public void downloadExtract(@PathVariable("documentId") Long documentId,
+                                @PathVariable("extractId") Long extractId,
+                                @RequestBody SysDocumentExtract extract,
+                                HttpServletResponse response) throws Exception
+    {
+        SysDocument document = sysDocumentService.selectDocumentById(documentId);
+        if (document == null)
+        {
+            throw new IllegalArgumentException("文档不存在");
+        }
+        documentExtractService.validateDownload(documentId);
+        String fileName = StringUtils.defaultString(document.getDocumentName())
+                .replaceAll("[\\\\/:*?\"<>|]", "_") + "-" + document.getDocumentKind() + ".docx";
+        response.setContentType("application/vnd.openxmlformats-officedocument.wordprocessingml.document");
+        FileUtils.setAttachmentResponseHeader(response, fileName);
+        documentExtractService.download(documentId, extractId, extract.getFinalJson(), response.getOutputStream());
     }
 
     /**
