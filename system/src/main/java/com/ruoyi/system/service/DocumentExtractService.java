@@ -61,6 +61,7 @@ public class DocumentExtractService
     public SysDocumentExtract selectLatest(Long documentId)
     {
         SysDocument document = getDocument(documentId);
+        requireInternalDocument(document);
         requireDocumentKind(document);
         SysDocumentExtract extract = extractMapper.selectLatestByDocumentId(documentId, document.getDocumentKind());
         if (extract != null)
@@ -73,6 +74,7 @@ public class DocumentExtractService
     public int saveFinalJson(Long documentId, Long extractId, String finalJson, boolean confirmed)
     {
         SysDocument document = getDocument(documentId);
+        requireInternalDocument(document);
         requireDocumentKind(document);
         validateJson(finalJson);
         SysDocumentExtract extract = extractMapper.selectById(documentId, extractId, document.getDocumentKind());
@@ -91,6 +93,7 @@ public class DocumentExtractService
     public void download(Long documentId, Long extractId, String finalJson, OutputStream outputStream)
     {
         SysDocument document = getDocument(documentId);
+        requireInternalDocument(document);
         documentWordExportService.validateTemplate(document);
         saveFinalJson(documentId, extractId, finalJson, true);
         documentWordExportService.writeDocument(document, finalJson, outputStream);
@@ -98,7 +101,9 @@ public class DocumentExtractService
 
     public void validateDownload(Long documentId)
     {
-        documentWordExportService.validateTemplate(getDocument(documentId));
+        SysDocument document = getDocument(documentId);
+        requireInternalDocument(document);
+        documentWordExportService.validateTemplate(document);
     }
 
     public void deleteByDocumentIds(Long[] documentIds)
@@ -114,6 +119,7 @@ public class DocumentExtractService
     private SysDocument getExtractableDocument(Long documentId)
     {
         SysDocument document = getDocument(documentId);
+        requireInternalDocument(document);
         requireDocumentKind(document);
         if (StringUtils.isEmpty(document.getOcrContent()))
         {
@@ -141,6 +147,14 @@ public class DocumentExtractService
         if (!DocumentConstants.DOCUMENT_KINDS.contains(document.getDocumentKind()))
         {
             throw new ServiceException("文档类型不正确");
+        }
+    }
+
+    private void requireInternalDocument(SysDocument document)
+    {
+        if (!DocumentConstants.TYPE_INTERNAL.equals(document.getDocumentType()))
+        {
+            throw new ServiceException("外部文档只执行 OCR，不进行 AI 提取或 Word 模板导出");
         }
     }
 

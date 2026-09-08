@@ -26,10 +26,12 @@ import com.ruoyi.system.domain.SysDocumentRecord;
 import com.ruoyi.system.domain.SysTag;
 import com.ruoyi.system.constant.DocumentConstants;
 import com.ruoyi.system.mapper.SysDocumentMapper;
+import com.ruoyi.system.mapper.SysDocumentExtractMapper;
 import com.ruoyi.system.mapper.SysDocumentRecordMapper;
 import com.ruoyi.system.mapper.SysTagMapper;
 import com.ruoyi.system.service.ISysDocumentService;
 import com.ruoyi.system.service.DocumentExtractService;
+import com.ruoyi.system.domain.SysDocumentExtract;
 
 /**
  * 文档管理Service业务层处理
@@ -50,6 +52,9 @@ public class SysDocumentServiceImpl implements ISysDocumentService {
 
     @Autowired
     private SysDocumentRecordMapper recordMapper;
+
+    @Autowired
+    private SysDocumentExtractMapper extractMapper;
 
     @Autowired
     private DocumentExtractService documentExtractService;
@@ -83,7 +88,9 @@ public class SysDocumentServiceImpl implements ISysDocumentService {
             throw new ServiceException("请输入有效的检索关键词");
         }
         String scope = document.getSearchScope();
-        if (!DocumentConstants.SEARCH_OCR.equals(scope) && !DocumentConstants.SEARCH_RECORD.equals(scope)) {
+        if (!DocumentConstants.SEARCH_OCR.equals(scope)
+                && !DocumentConstants.SEARCH_RECORD.equals(scope)
+                && !DocumentConstants.SEARCH_EXTRACT.equals(scope)) {
             scope = DocumentConstants.SEARCH_ALL;
         }
         document.setSearchScope(scope);
@@ -178,8 +185,8 @@ public class SysDocumentServiceImpl implements ISysDocumentService {
             insertTags(document.getTags(), document, document.getCreateBy());
         }
 
-        // 文档和标签先落库，OCR/AI 失败不影响上传本身。
-        autoParseAndExtract(document.getDocumentId());
+        // 文档和标签先落库。内部文档执行 OCR + AI，外部文档只执行 OCR。
+        autoParse(document);
         return rows;
     }
 
@@ -196,11 +203,13 @@ public class SysDocumentServiceImpl implements ISysDocumentService {
         // 文档所属范围由上传入口确定，普通编辑不能跨分类移动。
         document.setDocumentType(current.getDocumentType());
         document.setMaterialCategory(current.getMaterialCategory());
-        normalizeDocumentKind(document);
         if (DocumentConstants.TYPE_INTERNAL.equals(current.getDocumentType())) {
+            normalizeDocumentKind(document);
             document.setSourceName("");
             document.setSourceUrl("");
             document.setPublishDate(null);
+        } else {
+            document.setDocumentKind(null);
         }
         document.setUpdateTime(DateUtils.getNowDate());
         int rows = documentMapper.updateDocument(document);
@@ -367,6 +376,7 @@ public class SysDocumentServiceImpl implements ISysDocumentService {
             document.setPublishDate(null);
         } else if (DocumentConstants.TYPE_EXTERNAL.equals(document.getDocumentType())) {
             document.setMaterialCategory(null);
+            document.setDocumentKind(null);
         } else {
             throw new ServiceException("文档类型不正确");
         }
@@ -384,13 +394,15 @@ public class SysDocumentServiceImpl implements ISysDocumentService {
         document.setDocumentKind(documentKind);
     }
 
-    private void autoParseAndExtract(Long documentId) {
+    private void autoParse(SysDocument document) {
         try {
-            ocrDocument(documentId);
-            documentExtractService.extractDocument(documentId);
+            ocrDocument(document.getDocumentId());
+            if (DocumentConstants.TYPE_INTERNAL.equals(document.getDocumentType())) {
+                documentExtractService.extractDocument(document.getDocumentId());
+            }
         } catch (Exception e) {
             // OCR 或提示词未配置时，文档仍应保留在管理列表中。
-            log.warn("文档自动解析未完成，documentId: {}, 原因: {}", documentId, e.getMessage());
+            log.warn("文档自动解析未完成，documentId: {}, 原因: {}", document.getDocumentId(), e.getMessage());
         }
     }
 
@@ -409,18 +421,41 @@ public class SysDocumentServiceImpl implements ISysDocumentService {
 
         boolean ocrMatched = containsAny(ocr, keywords);
         boolean recordMatched = containsAny(recordText.toString(), keywords);
+        String extractText = latestExtractContent(document);
+        boolean extractMatched = containsAny(extractText, keywords);
         if (DocumentConstants.SEARCH_OCR.equals(scope)) {
             document.setMatchSource("OCR正文");
             document.setMatchSnippet(buildSnippet(ocr, keywords));
         } else if (DocumentConstants.SEARCH_RECORD.equals(scope)) {
             document.setMatchSource("使用记录与备注");
             document.setMatchSnippet(buildSnippet(recordText.toString(), keywords));
+        } else if (DocumentConstants.SEARCH_EXTRACT.equals(scope)) {
+            document.setMatchSource("AI 提取内容");
+            document.setMatchSnippet(buildSnippet(extractText, keywords));
         } else {
-            document.setMatchSource(ocrMatched && recordMatched ? "OCR正文 / 使用记录与备注" : (ocrMatched ? "OCR正文" : "使用记录与备注"));
-            document.setMatchSnippet(buildSnippet(ocrMatched ? ocr : recordText.toString(), keywords));
+            List<String> sources = new ArrayList<String>();
+            if (ocrMatched) sources.add("OCR正文");
+            if (recordMatched) sources.add("使用记录与备注");
+            if (extractMatched) sources.add("AI 提取内容");
+            document.setMatchSource(String.join(" / ", sources));
+            String matchedContent = ocrMatched ? ocr : (recordMatched ? recordText.toString() : extractText);
+            document.setMatchSnippet(buildSnippet(matchedContent, keywords));
         }
         // 搜索结果只返回摘要，避免列表接口携带整篇OCR正文。
         document.setOcrContent(null);
+    }
+
+    private String latestExtractContent(SysDocument document) {
+        if (!DocumentConstants.TYPE_INTERNAL.equals(document.getDocumentType())
+                || !DocumentConstants.DOCUMENT_KINDS.contains(document.getDocumentKind())) {
+            return "";
+        }
+        SysDocumentExtract extract = extractMapper.selectLatestByDocumentId(
+                document.getDocumentId(), document.getDocumentKind());
+        if (extract == null) {
+            return "";
+        }
+        return StringUtils.isNotEmpty(extract.getFinalJson()) ? extract.getFinalJson() : extract.getAiJson();
     }
 
     private boolean containsAny(String content, List<String> keywords) {

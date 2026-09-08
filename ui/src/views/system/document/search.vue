@@ -16,6 +16,7 @@
             <el-radio-button label="all">全部</el-radio-button>
             <el-radio-button label="ocr">OCR 正文</el-radio-button>
             <el-radio-button label="record">批注与使用记录</el-radio-button>
+            <el-radio-button label="extract">AI 提取内容</el-radio-button>
           </el-radio-group>
         </div>
       </div>

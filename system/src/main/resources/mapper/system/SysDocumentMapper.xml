@@ -92,6 +92,9 @@
                                    or r.remark like concat('%', #{word}, '%') escape '\\')
                         )
                     </when>
+                    <when test="searchScope == 'extract'">
+                        <include refid="latestExtractMatches"/>
+                    </when>
                     <otherwise>
                         (
                             d.ocr_content like concat('%', #{word}, '%') escape '\\'
@@ -102,6 +105,7 @@
                                   and (r.usage_content like concat('%', #{word}, '%') escape '\\'
                                        or r.remark like concat('%', #{word}, '%') escape '\\')
                             )
+                            or <include refid="latestExtractMatches"/>
                         )
                     </otherwise>
                 </choose>
@@ -109,6 +113,32 @@
         </where>
         order by d.create_time desc
     </select>
+
+    <!-- 优先检索用户确认/编辑后的 JSON；尚未确认时检索模型原始 JSON。 -->
+    <sql id="latestExtractMatches">
+        (
+            exists (
+                select 1 from sys_document_tds_extract e
+                where e.document_id = d.document_id
+                  and e.extract_id = (
+                      select max(e2.extract_id) from sys_document_tds_extract e2
+                      where e2.document_id = d.document_id
+                  )
+                  and coalesce(nullif(e.final_json, ''), e.ai_json, '')
+                      like concat('%', #{word}, '%') escape '\\'
+            )
+            or exists (
+                select 1 from sys_document_msds_extract e
+                where e.document_id = d.document_id
+                  and e.extract_id = (
+                      select max(e2.extract_id) from sys_document_msds_extract e2
+                      where e2.document_id = d.document_id
+                  )
+                  and coalesce(nullif(e.final_json, ''), e.ai_json, '')
+                      like concat('%', #{word}, '%') escape '\\'
+            )
+        )
+    </sql>
 
     <select id="selectDocumentStats" parameterType="SysDocument" resultType="java.util.HashMap">
         select count(*) as total,
@@ -143,7 +173,10 @@
             <if test="mimeType != null">mime_type = #{mimeType},</if>
             <if test="documentType != null">document_type = #{documentType},</if>
             <if test="materialCategory != null">material_category = #{materialCategory},</if>
-            <if test="documentKind != null">document_kind = #{documentKind},</if>
+            <choose>
+                <when test="documentType == 'EXTERNAL'">document_kind = null,</when>
+                <otherwise><if test="documentKind != null">document_kind = #{documentKind},</if></otherwise>
+            </choose>
             <choose>
                 <when test="documentType == 'EXTERNAL'">
                     source_name = #{sourceName},

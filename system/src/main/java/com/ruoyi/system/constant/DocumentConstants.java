@@ -21,6 +21,7 @@ public final class DocumentConstants
     public static final String SEARCH_ALL = "all";
     public static final String SEARCH_OCR = "ocr";
     public static final String SEARCH_RECORD = "record";
+    public static final String SEARCH_EXTRACT = "extract";
 
     public static final Set<String> MATERIAL_CATEGORIES = Collections.unmodifiableSet(new HashSet<String>(Arrays.asList(
             CATEGORY_RAW_MATERIAL,

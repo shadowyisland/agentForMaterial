@@ -291,8 +291,7 @@
               拖放文件到这里， 或 <em> 点击选择 </em>
             </div>
             <div slot="tip" class="el-upload__tip">
-              支持 PDF、 JPG、 PNG， 单个文件不超过 50 MB； 确认上传后自动进行
-              OCR 和 AI 解析。
+              支持 PDF、 JPG、 PNG， 单个文件不超过 50 MB； {{ uploadProcessTip }}
             </div>
           </el-upload>
         </el-form-item>
@@ -310,7 +309,7 @@
               <el-input v-model="form.internalCode" /> </el-form-item
           ></el-col>
         </el-row>
-        <el-form-item label="文档类型" prop="documentKind">
+        <el-form-item v-if="!isExternal" label="文档类型" prop="documentKind">
           <el-radio-group v-model="form.documentKind">
             <el-radio label="TDS"> TDS </el-radio>
             <el-radio label="MSDS"> MSDS </el-radio>
@@ -374,7 +373,7 @@
       <div class="document-processing">
         <i class="el-icon-loading document-processing-icon" />
         <h3>正在解析文档</h3>
-        <p>正在调用 MinerU 和 AI 处理文件</p>
+        <p>{{ processingDescription }}</p>
         <el-progress
           :percentage="processingProgress"
           :stroke-width="9"
@@ -433,7 +432,7 @@
                     /> </el-form-item
                 ></el-col>
               </el-row>
-              <el-form-item label="文档类型">
+              <el-form-item v-if="detailForm.documentType !== 'EXTERNAL'" label="文档类型">
                 <el-radio-group
                   v-model="detailForm.documentKind"
                   :disabled="!canEditDocument"
@@ -977,6 +976,16 @@ export default {
     uploadTitle() {
       return "上传至「" + this.pageTitle + "」";
     },
+    uploadProcessTip() {
+      return this.isExternal
+        ? "确认上传后自动进行 OCR，不进行 AI 解析。"
+        : "确认上传后自动进行 OCR 和 AI 解析。";
+    },
+    processingDescription() {
+      return this.isExternal
+        ? "正在调用 MinerU 进行 OCR"
+        : "正在调用 MinerU 和 AI 处理文件";
+    },
     processingProgress() {
       return Math.min(95, 8 + Math.floor((this.processingElapsed / 120) * 70));
     },
@@ -998,7 +1007,10 @@ export default {
       return this.hasPermission("system:document:edit");
     },
     canViewExtract() {
-      return this.hasPermission("system:document:extract:query");
+      return (
+        !this.isExternal &&
+        this.hasPermission("system:document:extract:query")
+      );
     },
     canSaveExtract() {
       return this.hasPermission("system:document:extract:edit");
@@ -1160,12 +1172,20 @@ export default {
         addDocument(Object.assign({}, this.form, this.scopeParams()))
           .then((res) => {
             const documentId = res.data;
-            this.$modal.msgSuccess("文档上传成功，已进入解析结果");
+            this.$modal.msgSuccess(
+              this.isExternal
+                ? "文档上传成功，OCR 已处理"
+                : "文档上传成功，已进入解析结果"
+            );
             this.uploadOpen = false;
             this.getList();
             this.getTagsList();
             this.getStats();
-            this.handleExtract({ documentId });
+            if (this.isExternal) {
+              this.handleDetail({ documentId });
+            } else {
+              this.handleExtract({ documentId });
+            }
           })
           .finally(() => {
             this.submitting = false;

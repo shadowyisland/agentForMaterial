@@ -93,6 +93,11 @@ public class DocumentWordTemplateRenderer
                     List<?> items = items(resolve(root, item, marker.group(1), index), false);
                     for (int i = 0; i < items.size(); i++)
                     {
+                        // 模板默认数组项可能只包含“类别/单位”等说明文字；没有实际数据时不导出该行。
+                        if (shouldRemoveRow(node, root, items.get(i), i + 1))
+                        {
+                            continue;
+                        }
                         Node copy = node.cloneNode(true);
                         if (i > 0)
                         {
@@ -117,7 +122,8 @@ public class DocumentWordTemplateRenderer
                 Matcher marker = PARAGRAPH.matcher(paragraphText(node).trim());
                 if (marker.matches())
                 {
-                    List<?> lines = items(resolve(root, item, marker.group(1), index), true);
+                    // 空的多行字段直接移除占位段落，避免 Word 中留下空白内容。
+                    List<?> lines = items(resolve(root, item, marker.group(1), index), false);
                     for (Object line : lines)
                     {
                         Node copy = node.cloneNode(true);
@@ -256,53 +262,85 @@ public class DocumentWordTemplateRenderer
     private boolean shouldRemoveRow(Node row, Map<String, Object> root, Object item, int index)
     {
         Matcher tokens = TOKEN.matcher(rowText(row));
-        boolean hasFieldToken = false;
+        List<String> paths = new ArrayList<String>();
+        List<String> primaryPaths = new ArrayList<String>();
         while (tokens.find())
         {
             String path = tokens.group(1);
-            if (path.startsWith("#") || path.startsWith("+") || path.startsWith("@"))
+            if (path.startsWith("#") || path.startsWith("@"))
             {
                 continue;
             }
-            hasFieldToken = true;
+            if (path.startsWith("+"))
+            {
+                path = path.substring(1);
+            }
+            paths.add(path);
+            if (isPrimaryDataPath(path))
+            {
+                primaryPaths.add(path);
+            }
+        }
+        // 含“数值/含量”等核心字段的规格行，只由核心字段决定是否显示；
+        // 单位、测试方法和类别等模板默认值不能单独让空行出现在导出文件中。
+        List<String> candidates = primaryPaths.isEmpty() ? paths : primaryPaths;
+        for (String path : candidates)
+        {
             if (hasValue(root, item, path, index))
             {
                 return false;
             }
         }
-        return hasFieldToken;
+        return !paths.isEmpty();
     }
 
     private boolean hasValue(Map<String, Object> root, Object item, String path, int index)
     {
-        if (".".equals(path) || "@序号".equals(path))
-        {
-            return true;
-        }
-        return hasPath(path.startsWith(".") ? item : root, path.startsWith(".") ? path.substring(1) : path);
+        return isMeaningful(resolve(root, item, path, index));
     }
 
-    private boolean hasPath(Object value, String path)
+    private boolean isPrimaryDataPath(String path)
     {
-        if (!(value instanceof Map))
+        String leaf = path;
+        int dot = leaf.lastIndexOf('.');
+        if (dot >= 0)
+        {
+            leaf = leaf.substring(dot + 1);
+        }
+        return "数值".equals(leaf) || "含量".equals(leaf) || "时间数值".equals(leaf)
+                || "输出".equals(leaf) || "种类名".equals(leaf) || "成分名称".equals(leaf)
+                || "元素名称".equals(leaf);
+    }
+
+    private boolean isMeaningful(Object value)
+    {
+        if (value == null)
         {
             return false;
         }
-        Map<?, ?> object = (Map<?, ?>) value;
-        if (object.containsKey(path))
+        if (value instanceof Iterable)
         {
-            return true;
-        }
-        String prefix = null;
-        for (Object key : object.keySet())
-        {
-            String name = String.valueOf(key);
-            if (path.startsWith(name + ".") && (prefix == null || name.length() > prefix.length()))
+            for (Object item : (Iterable<?>) value)
             {
-                prefix = name;
+                if (isMeaningful(item))
+                {
+                    return true;
+                }
             }
+            return false;
         }
-        return prefix != null && hasPath(object.get(prefix), path.substring(prefix.length() + 1));
+        if (value instanceof Map)
+        {
+            for (Object item : ((Map<?, ?>) value).values())
+            {
+                if (isMeaningful(item))
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+        return !display(value).trim().isEmpty();
     }
 
     private Object pathValue(Object value, String path)

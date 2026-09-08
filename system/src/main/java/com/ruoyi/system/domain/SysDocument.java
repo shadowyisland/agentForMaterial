@@ -98,7 +98,7 @@ public class SysDocument extends BaseEntity {
     /** 全局检索关键词（空格分词） */
     private String keyword;
 
-    /** 检索范围：all / ocr / record */
+    /** 检索范围：all / ocr / record / extract */
     private String searchScope;
 
     /** 已转义的检索词，仅供Mapper使用 */

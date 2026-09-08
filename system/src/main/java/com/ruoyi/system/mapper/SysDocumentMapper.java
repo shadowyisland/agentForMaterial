@@ -20,7 +20,7 @@ public interface SysDocumentMapper
      */
     public List<SysDocument> selectDocumentList(SysDocument document);
 
-    /** 跨类型检索OCR正文和使用记录。 */
+    /** 跨类型检索 OCR 正文、使用记录和 AI 提取内容。 */
     public List<SysDocument> searchDocumentList(SysDocument document);
 
     /** 查询当前类型/分类统计。 */
