@@ -3,6 +3,7 @@ package com.ruoyi.system.service;
 import java.util.Date;
 import java.util.List;
 import com.ruoyi.common.core.domain.entity.SysUser;
+import com.ruoyi.common.core.domain.model.UserApprovalBody;
 
 /**
  * 用户 业务层
@@ -144,6 +145,22 @@ public interface ISysUserService
      * @return 结果
      */
     public int updateUserStatus(SysUser user);
+
+    /**
+     * 审批自助注册申请
+     *
+     * @param approval 审批信息
+     * @param approvalBy 审批人
+     * @return 结果
+     */
+    public int reviewRegistration(UserApprovalBody approval, String approvalBy);
+
+    /**
+     * 查询待审批注册申请数量
+     *
+     * @return 待审批数量
+     */
+    public int countPendingApproval();
 
     /**
      * 修改用户基本信息

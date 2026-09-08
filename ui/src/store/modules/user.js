@@ -49,6 +49,7 @@ const user = {
       const uuid = userInfo.uuid
       return new Promise((resolve, reject) => {
         login(username, password, code, uuid).then(res => {
+          sessionStorage.removeItem('pendingApprovalReminderShown')
           setToken(res.token)
           commit('SET_TOKEN', res.token)
           resolve()
@@ -104,6 +105,7 @@ const user = {
           commit('SET_ROLES', [])
           commit('SET_PERMISSIONS', [])
           removeToken()
+          sessionStorage.removeItem('pendingApprovalReminderShown')
           resolve()
         }).catch(error => {
           reject(error)
@@ -116,6 +118,7 @@ const user = {
       return new Promise(resolve => {
         commit('SET_TOKEN', '')
         removeToken()
+        sessionStorage.removeItem('pendingApprovalReminderShown')
         resolve()
       })
     }

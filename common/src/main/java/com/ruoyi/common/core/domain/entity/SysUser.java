@@ -74,6 +74,19 @@ public class SysUser extends BaseEntity
     /** 密码最后更新时间 */
     private Date pwdUpdateDate;
 
+    /** 注册审批状态（0待审批 1已通过 2已拒绝） */
+    @Excel(name = "审批状态", readConverterExp = "0=待审批,1=已通过,2=已拒绝")
+    private String approvalStatus;
+
+    /** 审批人 */
+    private String approvalBy;
+
+    /** 审批时间 */
+    private Date approvalTime;
+
+    /** 审批意见 */
+    private String approvalRemark;
+
     /** 部门对象 */
     @Excels({
         @Excel(name = "部门名称", targetAttr = "deptName", type = Type.EXPORT),
@@ -262,6 +275,46 @@ public class SysUser extends BaseEntity
         this.pwdUpdateDate = pwdUpdateDate;
     }
 
+    public String getApprovalStatus()
+    {
+        return approvalStatus;
+    }
+
+    public void setApprovalStatus(String approvalStatus)
+    {
+        this.approvalStatus = approvalStatus;
+    }
+
+    public String getApprovalBy()
+    {
+        return approvalBy;
+    }
+
+    public void setApprovalBy(String approvalBy)
+    {
+        this.approvalBy = approvalBy;
+    }
+
+    public Date getApprovalTime()
+    {
+        return approvalTime;
+    }
+
+    public void setApprovalTime(Date approvalTime)
+    {
+        this.approvalTime = approvalTime;
+    }
+
+    public String getApprovalRemark()
+    {
+        return approvalRemark;
+    }
+
+    public void setApprovalRemark(String approvalRemark)
+    {
+        this.approvalRemark = approvalRemark;
+    }
+
     public SysDept getDept()
     {
         return dept;
@@ -329,6 +382,10 @@ public class SysUser extends BaseEntity
             .append("loginIp", getLoginIp())
             .append("loginDate", getLoginDate())
             .append("pwdUpdateDate", getPwdUpdateDate())
+            .append("approvalStatus", getApprovalStatus())
+            .append("approvalBy", getApprovalBy())
+            .append("approvalTime", getApprovalTime())
+            .append("approvalRemark", getApprovalRemark())
             .append("createBy", getCreateBy())
             .append("createTime", getCreateTime())
             .append("updateBy", getUpdateBy())

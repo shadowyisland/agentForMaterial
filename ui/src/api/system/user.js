@@ -134,3 +134,28 @@ export function deptTreeSelect() {
     method: 'get'
   })
 }
+
+// 查询注册申请审批信息
+export function getUserApproval(userId) {
+  return request({
+    url: '/system/user/approval/' + userId,
+    method: 'get'
+  })
+}
+
+// 审批注册申请
+export function reviewUserRegistration(data) {
+  return request({
+    url: '/system/user/approval',
+    method: 'put',
+    data: data
+  })
+}
+
+// 查询待审批注册申请数量
+export function getPendingApprovalCount() {
+  return request({
+    url: '/system/user/approval/pendingCount',
+    method: 'get'
+  })
+}

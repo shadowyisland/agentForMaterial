@@ -4,15 +4,18 @@
       <section class="brand-panel">
         <div class="brand-logo-plate"><img :src="logo" alt="材料智能体 Logo" /></div>
       </section>
-      <el-form ref="loginForm" :model="loginForm" :rules="loginRules" class="login-form">
+      <el-form ref="loginForm" :model="loginForm" :rules="loginRules" class="login-form" autocomplete="off">
       <img :src="logo" alt="材料智能体 Logo" class="mobile-logo" />
       <h3 class="title">登录{{title}}</h3>
       <el-form-item prop="username">
         <el-input
           v-model="loginForm.username"
           type="text"
-          auto-complete="off"
+          name="loginAccount"
+          autocomplete="off"
+          :readonly="accountReadonly"
           placeholder="账号"
+          @focus="accountReadonly = false"
         >
           <svg-icon slot="prefix" icon-class="user" class="el-input__icon input-icon" />
         </el-input>
@@ -21,8 +24,11 @@
         <el-input
           v-model="loginForm.password"
           type="password"
-          auto-complete="off"
+          name="loginPassword"
+          autocomplete="new-password"
+          :readonly="passwordReadonly"
           placeholder="密码"
+          @focus="passwordReadonly = false"
           @keyup.enter.native="handleLogin"
         >
           <svg-icon slot="prefix" icon-class="password" class="el-input__icon input-icon" />
@@ -79,8 +85,8 @@ export default {
       logo: logoImg,
       codeUrl: "",
       loginForm: {
-        username: "admin",
-        password: "admin123",
+        username: "",
+        password: "",
         rememberMe: false,
         code: "",
         uuid: ""
@@ -96,10 +102,12 @@ export default {
         // ,code: [{ required: true, trigger: "change", message: "请输入验证码" }]
       },
       loading: false,
+      accountReadonly: true,
+      passwordReadonly: true,
       // 验证码开关
       captchaEnabled: false,
       // 注册开关
-      register: false,
+      register: true,
       redirect: undefined
     }
   },
@@ -128,29 +136,47 @@ export default {
     //   })
     // },
     getCookie() {
+      const rememberMe = Cookies.get('rememberMe') === 'true'
       const username = Cookies.get("username")
       const password = Cookies.get("password")
-      const rememberMe = Cookies.get('rememberMe')
-      this.loginForm = {
-        username: username === undefined ? this.loginForm.username : username,
-        password: password === undefined ? this.loginForm.password : decrypt(password),
-        rememberMe: rememberMe === undefined ? false : Boolean(rememberMe)
+      if (!rememberMe || !username || !password) {
+        this.clearRememberedLogin()
+        return
+      }
+      try {
+        this.loginForm.username = username
+        this.loginForm.password = decrypt(password)
+        this.loginForm.rememberMe = true
+      } catch (e) {
+        this.clearRememberedLogin()
+      }
+    },
+    clearRememberedLogin() {
+      this.loginForm.username = ""
+      this.loginForm.password = ""
+      this.loginForm.rememberMe = false
+      this.removeRememberedCookies()
+    },
+    removeRememberedCookies() {
+      Cookies.remove("username")
+      Cookies.remove("password")
+      Cookies.remove('rememberMe')
+    },
+    saveRememberedLogin() {
+      if (this.loginForm.rememberMe) {
+        Cookies.set("username", this.loginForm.username, { expires: 30 })
+        Cookies.set("password", encrypt(this.loginForm.password), { expires: 30 })
+        Cookies.set('rememberMe', 'true', { expires: 30 })
+      } else {
+        this.removeRememberedCookies()
       }
     },
     handleLogin() {
       this.$refs.loginForm.validate(valid => {
         if (valid) {
           this.loading = true
-          if (this.loginForm.rememberMe) {
-            Cookies.set("username", this.loginForm.username, { expires: 30 })
-            Cookies.set("password", encrypt(this.loginForm.password), { expires: 30 })
-            Cookies.set('rememberMe', this.loginForm.rememberMe, { expires: 30 })
-          } else {
-            Cookies.remove("username")
-            Cookies.remove("password")
-            Cookies.remove('rememberMe')
-          }
           this.$store.dispatch("Login", this.loginForm).then(() => {
+            this.saveRememberedLogin()
             this.$router.push({ path: this.redirect || "/" }).catch(()=>{})
           }).catch(() => {
             this.loading = false

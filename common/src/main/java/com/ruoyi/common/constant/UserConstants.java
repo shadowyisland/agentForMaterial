@@ -76,6 +76,25 @@ public class UserConstants
     /**
      * 密码长度限制
      */
+    /** 兼容存量账号登录的历史密码下限 */
     public static final int PASSWORD_MIN_LENGTH = 5;
     public static final int PASSWORD_MAX_LENGTH = 20;
+
+    /** 新注册、新建和重置密码的安全下限 */
+    public static final int NEW_PASSWORD_MIN_LENGTH = 8;
+
+    /** 注册审批状态：待审批 */
+    public static final String APPROVAL_PENDING = "0";
+
+    /** 注册审批状态：已通过 */
+    public static final String APPROVAL_APPROVED = "1";
+
+    /** 注册审批状态：已拒绝 */
+    public static final String APPROVAL_REJECTED = "2";
+
+    /** 注册后可选择的普通管理员角色标识 */
+    public static final String ROLE_KEY_MANAGER = "manager";
+
+    /** 注册后可选择的普通用户角色标识 */
+    public static final String ROLE_KEY_COMMON = "common";
 }

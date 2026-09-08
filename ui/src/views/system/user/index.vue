@@ -17,8 +17,8 @@
         <pane size="84">
           <el-col>
             <el-form :model="queryParams" ref="queryForm" size="small" :inline="true" v-show="showSearch" label-width="68px">
-              <el-form-item label="用户名称" prop="userName">
-                <el-input v-model="queryParams.userName" placeholder="请输入用户名称" clearable style="width: 240px" @keyup.enter.native="handleQuery" />
+              <el-form-item label="账号" prop="userName">
+                <el-input v-model="queryParams.userName" placeholder="请输入账号" clearable style="width: 240px" @keyup.enter.native="handleQuery" />
               </el-form-item>
               <el-form-item label="手机号码" prop="phonenumber">
                 <el-input v-model="queryParams.phonenumber" placeholder="请输入手机号码" clearable style="width: 240px" @keyup.enter.native="handleQuery" />
@@ -26,6 +26,13 @@
               <el-form-item label="状态" prop="status">
                 <el-select v-model="queryParams.status" placeholder="用户状态" clearable style="width: 240px">
                   <el-option v-for="dict in dict.type.sys_normal_disable" :key="dict.value" :label="dict.label" :value="dict.value" />
+                </el-select>
+              </el-form-item>
+              <el-form-item label="审批状态" prop="approvalStatus">
+                <el-select v-model="queryParams.approvalStatus" placeholder="审批状态" clearable style="width: 160px">
+                  <el-option label="待审批" value="0" />
+                  <el-option label="已通过" value="1" />
+                  <el-option label="已拒绝" value="2" />
                 </el-select>
               </el-form-item>
               <el-form-item label="创建时间">
@@ -59,13 +66,18 @@
             <el-table v-loading="loading" :data="userList" @selection-change="handleSelectionChange">
               <el-table-column type="selection" width="50" align="center" />
               <el-table-column label="用户编号" align="center" key="userId" prop="userId" v-if="columns.userId.visible" />
-              <el-table-column label="用户名称" align="center" key="userName" prop="userName" v-if="columns.userName.visible" :show-overflow-tooltip="true" />
-              <el-table-column label="用户昵称" align="center" key="nickName" prop="nickName" v-if="columns.nickName.visible" :show-overflow-tooltip="true" />
+              <el-table-column label="账号" align="center" key="userName" prop="userName" v-if="columns.userName.visible" :show-overflow-tooltip="true" />
+              <el-table-column label="姓名" align="center" key="nickName" prop="nickName" v-if="columns.nickName.visible" :show-overflow-tooltip="true" />
               <el-table-column label="部门" align="center" key="deptName" prop="dept.deptName" v-if="columns.deptName.visible" :show-overflow-tooltip="true" />
               <el-table-column label="手机号码" align="center" key="phonenumber" prop="phonenumber" v-if="columns.phonenumber.visible" width="120" />
+              <el-table-column label="审批状态" align="center" key="approvalStatus" v-if="columns.approvalStatus.visible" width="100">
+                <template slot-scope="scope">
+                  <el-tag :type="approvalTagType(scope.row.approvalStatus)" size="small">{{ approvalStatusLabel(scope.row.approvalStatus) }}</el-tag>
+                </template>
+              </el-table-column>
               <el-table-column label="状态" align="center" key="status" v-if="columns.status.visible">
                 <template slot-scope="scope">
-                  <el-switch v-model="scope.row.status" active-value="0" inactive-value="1" @change="handleStatusChange(scope.row)"></el-switch>
+                  <el-switch v-model="scope.row.status" active-value="0" inactive-value="1" :disabled="scope.row.approvalStatus !== '1'" @change="handleStatusChange(scope.row)"></el-switch>
                 </template>
               </el-table-column>
               <el-table-column label="创建时间" align="center" prop="createTime" v-if="columns.createTime.visible" width="160">
@@ -73,8 +85,9 @@
                   <span>{{ parseTime(scope.row.createTime) }}</span>
                 </template>
               </el-table-column>
-              <el-table-column label="操作" align="center" width="160" class-name="small-padding fixed-width">
+              <el-table-column label="操作" align="center" width="220" class-name="small-padding fixed-width">
                 <template slot-scope="scope" v-if="scope.row.userId !== 1">
+                  <el-button v-if="scope.row.approvalStatus === '0'" size="mini" type="text" icon="el-icon-s-check" @click="handleApproval(scope.row)" v-hasRole="['admin']">审批</el-button>
                   <el-button size="mini" type="text" icon="el-icon-edit" @click="handleUpdate(scope.row)" v-hasPermi="['system:user:edit']">修改</el-button>
                   <el-button size="mini" type="text" icon="el-icon-delete" @click="handleDelete(scope.row)" v-hasPermi="['system:user:remove']">删除</el-button>
                   <el-dropdown size="mini" @command="(command) => handleCommand(command, scope.row)" v-hasPermi="['system:user:resetPwd', 'system:user:edit']">
@@ -99,8 +112,8 @@
       <el-form ref="form" :model="form" :rules="rules" label-width="80px">
         <el-row>
           <el-col :span="12">
-            <el-form-item label="用户昵称" prop="nickName">
-              <el-input v-model="form.nickName" placeholder="请输入用户昵称" maxlength="30" />
+            <el-form-item label="姓名" prop="nickName">
+              <el-input v-model="form.nickName" placeholder="请输入姓名" maxlength="30" />
             </el-form-item>
           </el-col>
           <el-col :span="12">
@@ -123,8 +136,8 @@
         </el-row>
         <el-row>
           <el-col :span="12">
-            <el-form-item v-if="form.userId == undefined" label="用户名称" prop="userName">
-              <el-input v-model="form.userName" placeholder="请输入用户名称" maxlength="30" />
+            <el-form-item v-if="form.userId == undefined" label="账号" prop="userName">
+              <el-input v-model="form.userName" placeholder="请输入账号" maxlength="30" />
             </el-form-item>
           </el-col>
           <el-col :span="12">
@@ -179,6 +192,32 @@
       </div>
     </el-dialog>
 
+    <!-- 注册申请审批对话框 -->
+    <el-dialog title="注册申请审批" :visible.sync="approvalOpen" width="520px" append-to-body>
+      <el-descriptions :column="1" border size="small" style="margin-bottom: 18px">
+        <el-descriptions-item label="账号">{{ approvalForm.userName }}</el-descriptions-item>
+        <el-descriptions-item label="姓名">{{ approvalForm.nickName }}</el-descriptions-item>
+        <el-descriptions-item label="手机号">{{ approvalForm.phonenumber }}</el-descriptions-item>
+        <el-descriptions-item label="归属部门">{{ approvalForm.deptName }}</el-descriptions-item>
+        <el-descriptions-item label="申请时间">{{ parseTime(approvalForm.createTime) }}</el-descriptions-item>
+      </el-descriptions>
+      <el-form ref="approvalForm" :model="approvalForm" label-width="90px">
+        <el-form-item label="分配角色" required>
+          <el-radio-group v-model="approvalForm.roleId">
+            <el-radio v-for="role in approvalRoleOptions" :key="role.roleId" :label="role.roleId">{{ role.roleName }}</el-radio>
+          </el-radio-group>
+        </el-form-item>
+        <el-form-item label="审批意见">
+          <el-input v-model="approvalForm.remark" type="textarea" :rows="3" maxlength="500" show-word-limit placeholder="可填写审批说明或拒绝原因" />
+        </el-form-item>
+      </el-form>
+      <div slot="footer" class="dialog-footer">
+        <el-button type="danger" plain @click="submitApproval(false)">拒 绝</el-button>
+        <el-button type="primary" @click="submitApproval(true)">通过并启用</el-button>
+        <el-button @click="approvalOpen = false">取 消</el-button>
+      </div>
+    </el-dialog>
+
     <!-- 用户导入对话框 -->
     <el-dialog :title="upload.title" :visible.sync="upload.open" width="400px" append-to-body>
       <el-upload ref="upload" :limit="1" accept=".xlsx, .xls" :headers="upload.headers" :action="upload.url + '?updateSupport=' + upload.updateSupport" :disabled="upload.isUploading" :on-progress="handleFileUploadProgress" :on-success="handleFileSuccess" :auto-upload="false" drag>
@@ -201,7 +240,7 @@
 </template>
 
 <script>
-import { listUser, getUser, delUser, addUser, updateUser, resetUserPwd, changeUserStatus, deptTreeSelect } from "@/api/system/user"
+import { listUser, getUser, delUser, addUser, updateUser, resetUserPwd, changeUserStatus, deptTreeSelect, getUserApproval, reviewUserRegistration } from "@/api/system/user"
 import { getToken } from "@/utils/auth"
 import Treeselect from "@riophae/vue-treeselect"
 import "@riophae/vue-treeselect/dist/vue-treeselect.css"
@@ -236,6 +275,12 @@ export default {
       enabledDeptOptions: undefined,
       // 是否显示弹出层
       open: false,
+      // 是否显示注册审批弹出层
+      approvalOpen: false,
+      // 注册审批表单
+      approvalForm: {},
+      // 注册审批可选角色
+      approvalRoleOptions: [],
       // 部门名称
       deptName: undefined,
       // 默认密码
@@ -274,30 +319,32 @@ export default {
         userName: undefined,
         phonenumber: undefined,
         status: undefined,
+        approvalStatus: undefined,
         deptId: undefined
       },
       // 列信息
       columns: {
         userId: { label: '用户编号', visible: true },
-        userName: { label: '用户名称', visible: true },
-        nickName: { label: '用户昵称', visible: true },
+        userName: { label: '账号', visible: true },
+        nickName: { label: '姓名', visible: true },
         deptName: { label: '部门', visible: true },
         phonenumber: { label: '手机号码', visible: true },
+        approvalStatus: { label: '审批状态', visible: true },
         status: { label: '状态', visible: true },
         createTime: { label: '创建时间', visible: true }
       },
       // 表单校验
       rules: {
         userName: [
-          { required: true, message: "用户名称不能为空", trigger: "blur" },
-          { min: 2, max: 20, message: '用户名称长度必须介于 2 和 20 之间', trigger: 'blur' }
+          { required: true, message: "账号不能为空", trigger: "blur" },
+          { min: 2, max: 20, message: '账号长度必须介于 2 和 20 之间', trigger: 'blur' }
         ],
         nickName: [
-          { required: true, message: "用户昵称不能为空", trigger: "blur" }
+          { required: true, message: "姓名不能为空", trigger: "blur" }
         ],
         password: [
           { required: true, message: "用户密码不能为空", trigger: "blur" },
-          { min: 5, max: 20, message: '用户密码长度必须介于 5 和 20 之间', trigger: 'blur' },
+          { min: 8, max: 20, message: '用户密码长度必须介于 8 和 20 之间', trigger: 'blur' },
           { pattern: /^[^<>"'|\\]+$/, message: "不能包含非法字符：< > \" ' \\\ |", trigger: "blur" }
         ],
         email: [
@@ -324,6 +371,9 @@ export default {
     }
   },
   created() {
+    if (this.$route.query.approvalStatus !== undefined) {
+      this.queryParams.approvalStatus = String(this.$route.query.approvalStatus)
+    }
     this.getList()
     this.getDeptTree()
     this.getConfigKey("sys.user.initPassword").then(response => {
@@ -468,8 +518,8 @@ export default {
         confirmButtonText: "确定",
         cancelButtonText: "取消",
         closeOnClickModal: false,
-        inputPattern: /^.{5,20}$/,
-        inputErrorMessage: "用户密码长度必须介于 5 和 20 之间",
+        inputPattern: /^.{8,20}$/,
+        inputErrorMessage: "用户密码长度必须介于 8 和 20 之间",
         inputValidator: (value) => {
           if (/<|>|"|'|\||\\/.test(value)) {
             return "不能包含非法字符：< > \" ' \\\ |"
@@ -485,6 +535,53 @@ export default {
     handleAuthRole: function(row) {
       const userId = row.userId
       this.$router.push("/system/user-auth/role/" + userId)
+    },
+    /** 审批状态文字 */
+    approvalStatusLabel(status) {
+      return { '0': '待审批', '1': '已通过', '2': '已拒绝' }[status] || '未知'
+    },
+    /** 审批状态标签样式 */
+    approvalTagType(status) {
+      return { '0': 'warning', '1': 'success', '2': 'danger' }[status] || 'info'
+    },
+    /** 打开注册申请审批 */
+    handleApproval(row) {
+      getUserApproval(row.userId).then(response => {
+        const user = response.data
+        this.approvalRoleOptions = response.roles || []
+        this.approvalForm = {
+          userId: user.userId,
+          userName: user.userName,
+          nickName: user.nickName,
+          phonenumber: user.phonenumber,
+          deptName: user.dept ? user.dept.deptName : '',
+          createTime: user.createTime,
+          roleId: undefined,
+          remark: ''
+        }
+        this.approvalOpen = true
+      })
+    },
+    /** 提交审批结果 */
+    submitApproval(approved) {
+      if (approved && !this.approvalForm.roleId) {
+        this.$modal.msgError("审批通过时请选择普通管理员或普通用户角色")
+        return
+      }
+      const data = {
+        userId: this.approvalForm.userId,
+        approved: approved,
+        roleId: approved ? this.approvalForm.roleId : undefined,
+        remark: this.approvalForm.remark
+      }
+      const action = approved ? "通过" : "拒绝"
+      this.$modal.confirm("确认" + action + "账号“" + this.approvalForm.userName + "”的注册申请吗？").then(() => {
+        return reviewUserRegistration(data)
+      }).then(() => {
+        this.$modal.msgSuccess("审批操作成功")
+        this.approvalOpen = false
+        this.getList()
+      }).catch(() => {})
     },
     /** 提交按钮 */
     submitForm: function() {

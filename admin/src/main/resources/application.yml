@@ -68,13 +68,14 @@ spring:
   # redis 配置
   redis:
     # 地址
-    host: localhost
+    # 本机开发时通过 SSH 将服务器 Redis 转发到 127.0.0.1:6379；服务器部署时直连本机 Redis
+    host: ${REDIS_HOST:127.0.0.1}
     # 端口，默认为6379
-    port: 6379
+    port: ${REDIS_PORT:6379}
     # 数据库索引
-    database: 0
+    database: ${REDIS_DATABASE:0}
     # 密码
-    password:
+    password: "${REDIS_PASSWORD:}"
     # 连接超时时间
     timeout: 10s
     lettuce:
@@ -143,18 +144,20 @@ baidu:
 file:
   parse:
     api:
-      url: http://127.0.0.1:8001
-      connectTimeout: 30000
-      responseTimeout: 300000
+      # 本机开发通过 SSH 转发；服务器部署时直接访问本机 MinerU
+      url: ${MINERU_API_URL:http://127.0.0.1:8001}
+      connectTimeout: ${MINERU_CONNECT_TIMEOUT:30000}
+      responseTimeout: ${MINERU_RESPONSE_TIMEOUT:300000}
 
 llm:
   qwen:
-    base-url: http://202.127.200.35:8081/v1
-    model: qwen3.8-27b
-    connect-timeout: 30000
-    response-timeout: 300000
-    temperature: 0
-    max-tokens: 262144
+    # 本机默认连接 SSH 转发端口 18081；生产配置会覆盖为服务器本机的 8081
+    base-url: ${QWEN_BASE_URL:http://127.0.0.1:18081/v1}
+    model: ${QWEN_MODEL:qwen3.8-27b}
+    connect-timeout: ${QWEN_CONNECT_TIMEOUT:30000}
+    response-timeout: ${QWEN_RESPONSE_TIMEOUT:300000}
+    temperature: ${QWEN_TEMPERATURE:0}
+    max-tokens: ${QWEN_MAX_TOKENS:262144}
 
 aliyun:
   oss:

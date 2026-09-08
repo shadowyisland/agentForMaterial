@@ -1,0 +1,18 @@
+[Unit]
+Description=Agent For Material Spring Boot service
+After=network-online.target mysql.service redis-server.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=agentmat
+Group=agentmat
+WorkingDirectory=/opt/agentForMaterial/backend
+EnvironmentFile=/etc/default/agent-material
+ExecStart=/usr/bin/java $JAVA_OPTS -jar /opt/agentForMaterial/backend/ruoyi-admin.jar --spring.profiles.active=prod --spring.config.additional-location=file:/opt/agentForMaterial/config/
+Restart=always
+RestartSec=5
+SuccessExitStatus=143
+
+[Install]
+WantedBy=multi-user.target

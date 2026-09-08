@@ -28,6 +28,13 @@ public interface ISysDeptService
     public List<TreeSelect> selectDeptTreeList(SysDept dept);
 
     /**
+     * 查询注册页可公开选择的启用部门树
+     *
+     * @return 部门树
+     */
+    public List<TreeSelect> selectPublicDeptTreeList();
+
+    /**
      * 构建前端所需要树结构
      * 
      * @param depts 部门列表

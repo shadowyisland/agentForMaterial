@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 import com.ruoyi.common.annotation.Log;
+import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.config.RuoYiConfig;
 import com.ruoyi.common.core.controller.BaseController;
 import com.ruoyi.common.core.domain.AjaxResult;
@@ -94,6 +95,12 @@ public class SysProfileController extends BaseController
     {
         String oldPassword = params.get("oldPassword");
         String newPassword = params.get("newPassword");
+        if (StringUtils.isEmpty(newPassword)
+                || newPassword.length() < UserConstants.NEW_PASSWORD_MIN_LENGTH
+                || newPassword.length() > UserConstants.PASSWORD_MAX_LENGTH)
+        {
+            return error("新密码长度必须在8到20个字符之间");
+        }
         LoginUser loginUser = getLoginUser();
         Long userId = loginUser.getUserId();
         SysUser user = userService.selectUserById(userId);

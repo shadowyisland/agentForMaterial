@@ -62,6 +62,17 @@ public class SysDeptServiceImpl implements ISysDeptService
     }
 
     /**
+     * 注册页匿名查询部门树。直接调用 Mapper，避免匿名请求进入需要登录态的数据权限切面。
+     */
+    @Override
+    public List<TreeSelect> selectPublicDeptTreeList()
+    {
+        SysDept dept = new SysDept();
+        dept.setStatus(UserConstants.DEPT_NORMAL);
+        return buildDeptTreeSelect(deptMapper.selectDeptList(dept));
+    }
+
+    /**
      * 构建前端所需要树结构
      * 
      * @param depts 部门列表

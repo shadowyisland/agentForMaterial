@@ -8,6 +8,7 @@ import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 import com.ruoyi.common.core.domain.entity.SysUser;
+import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.core.domain.model.LoginUser;
 import com.ruoyi.common.enums.UserStatus;
 import com.ruoyi.common.exception.ServiceException;
@@ -47,6 +48,16 @@ public class UserDetailsServiceImpl implements UserDetailsService
         {
             log.info("登录用户：{} 已被删除.", username);
             throw new ServiceException(MessageUtils.message("user.password.delete"));
+        }
+        else if (UserConstants.APPROVAL_PENDING.equals(user.getApprovalStatus()))
+        {
+            log.info("登录用户：{} 正在等待注册审批.", username);
+            throw new ServiceException("账号正在等待超级管理员审批");
+        }
+        else if (UserConstants.APPROVAL_REJECTED.equals(user.getApprovalStatus()))
+        {
+            log.info("登录用户：{} 的注册申请已被拒绝.", username);
+            throw new ServiceException("注册申请未通过，请联系超级管理员");
         }
         else if (UserStatus.DISABLE.getCode().equals(user.getStatus()))
         {

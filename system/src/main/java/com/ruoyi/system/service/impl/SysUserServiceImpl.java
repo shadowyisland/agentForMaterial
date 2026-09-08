@@ -15,6 +15,7 @@ import com.ruoyi.common.annotation.DataScope;
 import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.core.domain.entity.SysRole;
 import com.ruoyi.common.core.domain.entity.SysUser;
+import com.ruoyi.common.core.domain.model.UserApprovalBody;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.utils.SecurityUtils;
 import com.ruoyi.common.utils.StringUtils;
@@ -328,6 +329,64 @@ public class SysUserServiceImpl implements ISysUserService
     public int updateUserStatus(SysUser user)
     {
         return userMapper.updateUserStatus(user.getUserId(), user.getStatus());
+    }
+
+    /**
+     * 审批自助注册申请。审批通过与角色写入处于同一事务，避免出现已启用但无角色的账户。
+     */
+    @Override
+    @Transactional
+    public int reviewRegistration(UserApprovalBody approval, String approvalBy)
+    {
+        SysUser user = userMapper.selectUserById(approval.getUserId());
+        if (StringUtils.isNull(user) || !"0".equals(user.getDelFlag()))
+        {
+            throw new ServiceException("注册申请不存在或已被删除");
+        }
+        if (!UserConstants.APPROVAL_PENDING.equals(user.getApprovalStatus()))
+        {
+            throw new ServiceException("该注册申请已经处理，请刷新后重试");
+        }
+
+        userRoleMapper.deleteUserRoleByUserId(user.getUserId());
+        String accountStatus = UserConstants.USER_DISABLE;
+        String approvalStatus = UserConstants.APPROVAL_REJECTED;
+
+        if (Boolean.TRUE.equals(approval.getApproved()))
+        {
+            if (StringUtils.isNull(approval.getRoleId()))
+            {
+                throw new ServiceException("审批通过时必须选择用户角色");
+            }
+            SysRole role = roleMapper.selectRoleById(approval.getRoleId());
+            if (StringUtils.isNull(role)
+                    || !UserConstants.ROLE_NORMAL.equals(role.getStatus())
+                    || !(UserConstants.ROLE_KEY_MANAGER.equals(role.getRoleKey())
+                        || UserConstants.ROLE_KEY_COMMON.equals(role.getRoleKey())))
+            {
+                throw new ServiceException("只能分配普通管理员或普通用户角色");
+            }
+            insertUserRole(user.getUserId(), new Long[] { role.getRoleId() });
+            accountStatus = UserConstants.NORMAL;
+            approvalStatus = UserConstants.APPROVAL_APPROVED;
+        }
+
+        int rows = userMapper.updateUserApproval(user.getUserId(), accountStatus, approvalStatus,
+                approvalBy, approval.getRemark());
+        if (rows == 0)
+        {
+            throw new ServiceException("审批状态已发生变化，请刷新后重试");
+        }
+        return rows;
+    }
+
+    /**
+     * 查询待审批注册申请数量。
+     */
+    @Override
+    public int countPendingApproval()
+    {
+        return userMapper.countPendingApproval();
     }
 
     /**

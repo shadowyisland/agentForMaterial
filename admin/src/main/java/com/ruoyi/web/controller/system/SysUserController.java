@@ -22,8 +22,11 @@ import com.ruoyi.common.core.domain.AjaxResult;
 import com.ruoyi.common.core.domain.entity.SysDept;
 import com.ruoyi.common.core.domain.entity.SysRole;
 import com.ruoyi.common.core.domain.entity.SysUser;
+import com.ruoyi.common.core.domain.model.UserApprovalBody;
 import com.ruoyi.common.core.page.TableDataInfo;
+import com.ruoyi.common.constant.UserConstants;
 import com.ruoyi.common.enums.BusinessType;
+import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.utils.SecurityUtils;
 import com.ruoyi.common.utils.StringUtils;
 import com.ruoyi.common.utils.poi.ExcelUtil;
@@ -138,6 +141,10 @@ public class SysUserController extends BaseController
         {
             return error("新增用户'" + user.getUserName() + "'失败，邮箱账号已存在");
         }
+        else if (!isNewPasswordValid(user.getPassword()))
+        {
+            return error("用户密码长度必须在8到20个字符之间");
+        }
         user.setCreateBy(getUsername());
         user.setPassword(SecurityUtils.encryptPassword(user.getPassword()));
         return toAjax(userService.insertUser(user));
@@ -151,6 +158,7 @@ public class SysUserController extends BaseController
     @PutMapping
     public AjaxResult edit(@Validated @RequestBody SysUser user)
     {
+        checkApprovalCompleted(user.getUserId());
         userService.checkUserAllowed(user);
         userService.checkUserDataScope(user.getUserId());
         deptService.checkDeptDataScope(user.getDeptId());
@@ -194,8 +202,13 @@ public class SysUserController extends BaseController
     @PutMapping("/resetPwd")
     public AjaxResult resetPwd(@RequestBody SysUser user)
     {
+        checkApprovalCompleted(user.getUserId());
         userService.checkUserAllowed(user);
         userService.checkUserDataScope(user.getUserId());
+        if (!isNewPasswordValid(user.getPassword()))
+        {
+            return error("用户密码长度必须在8到20个字符之间");
+        }
         user.setPassword(SecurityUtils.encryptPassword(user.getPassword()));
         user.setUpdateBy(getUsername());
         return toAjax(userService.resetPwd(user));
@@ -209,6 +222,7 @@ public class SysUserController extends BaseController
     @PutMapping("/changeStatus")
     public AjaxResult changeStatus(@RequestBody SysUser user)
     {
+        checkApprovalCompleted(user.getUserId());
         userService.checkUserAllowed(user);
         userService.checkUserDataScope(user.getUserId());
         user.setUpdateBy(getUsername());
@@ -238,10 +252,56 @@ public class SysUserController extends BaseController
     @PutMapping("/authRole")
     public AjaxResult insertAuthRole(Long userId, Long[] roleIds)
     {
+        checkApprovalCompleted(userId);
         userService.checkUserDataScope(userId);
         roleService.checkRoleDataScope(roleIds);
         userService.insertUserAuth(userId, roleIds);
         return success();
+    }
+
+    /**
+     * 获取注册申请详情和可分配的两类角色。审批能力只属于超级管理员。
+     */
+    @PreAuthorize("@ss.hasRole('admin')")
+    @GetMapping("/approval/{userId}")
+    public AjaxResult approvalInfo(@PathVariable Long userId)
+    {
+        SysUser user = userService.selectUserById(userId);
+        if (StringUtils.isNull(user))
+        {
+            return error("注册申请不存在");
+        }
+        List<SysRole> roles = roleService.selectRoleAll().stream()
+                .filter(role -> UserConstants.ROLE_NORMAL.equals(role.getStatus()))
+                .filter(role -> UserConstants.ROLE_KEY_MANAGER.equals(role.getRoleKey())
+                        || UserConstants.ROLE_KEY_COMMON.equals(role.getRoleKey()))
+                .collect(Collectors.toList());
+        AjaxResult ajax = success();
+        ajax.put(AjaxResult.DATA_TAG, user);
+        ajax.put("roles", roles);
+        return ajax;
+    }
+
+    /**
+     * 超级管理员和普通管理员登录后查询待审批数量。
+     */
+    @PreAuthorize("@ss.hasAnyRoles('admin,manager')")
+    @GetMapping("/approval/pendingCount")
+    public AjaxResult pendingApprovalCount()
+    {
+        return success(userService.countPendingApproval());
+    }
+
+    /**
+     * 审批或拒绝注册申请。通过时由服务层原子地分配角色并启用账户。
+     */
+    @PreAuthorize("@ss.hasRole('admin')")
+    @Log(title = "用户注册审批", businessType = BusinessType.UPDATE)
+    @PutMapping("/approval")
+    public AjaxResult reviewRegistration(@Validated @RequestBody UserApprovalBody approval)
+    {
+        userService.reviewRegistration(approval, getUsername());
+        return success(Boolean.TRUE.equals(approval.getApproved()) ? "审批通过，账号已启用" : "申请已拒绝");
     }
 
     /**
@@ -252,5 +312,25 @@ public class SysUserController extends BaseController
     public AjaxResult deptTree(SysDept dept)
     {
         return success(deptService.selectDeptTreeList(dept));
+    }
+
+    /**
+     * 待审批或已拒绝账号只能走审批流程，不能绕过审批直接启用或分配角色。
+     */
+    private void checkApprovalCompleted(Long userId)
+    {
+        SysUser user = userService.selectUserById(userId);
+        if (StringUtils.isNotNull(user)
+                && !UserConstants.APPROVAL_APPROVED.equals(user.getApprovalStatus()))
+        {
+            throw new ServiceException("该账号属于注册申请，请通过审批功能处理");
+        }
+    }
+
+    private boolean isNewPasswordValid(String password)
+    {
+        return StringUtils.isNotEmpty(password)
+                && password.length() >= UserConstants.NEW_PASSWORD_MIN_LENGTH
+                && password.length() <= UserConstants.PASSWORD_MAX_LENGTH;
     }
 }

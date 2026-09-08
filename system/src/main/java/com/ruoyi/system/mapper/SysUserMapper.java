@@ -87,6 +87,20 @@ public interface SysUserMapper
     public int updateUserStatus(@Param("userId") Long userId, @Param("status") String status);
 
     /**
+     * 更新注册审批结果
+     */
+    public int updateUserApproval(@Param("userId") Long userId,
+            @Param("status") String status,
+            @Param("approvalStatus") String approvalStatus,
+            @Param("approvalBy") String approvalBy,
+            @Param("approvalRemark") String approvalRemark);
+
+    /**
+     * 查询待审批注册申请数量
+     */
+    public int countPendingApproval();
+
+    /**
      * 更新用户登录信息（IP和登录时间）
      * 
      * @param userId 用户ID

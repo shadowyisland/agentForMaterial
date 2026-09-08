@@ -18,6 +18,7 @@ import { AppMain, Navbar, Settings, Sidebar, TagsView } from './components'
 import ResizeMixin from './mixin/ResizeHandler'
 import { mapState } from 'vuex'
 import variables from '@/assets/styles/variables.scss'
+import { getPendingApprovalCount } from '@/api/system/user'
 
 export default {
   name: 'Layout',
@@ -50,7 +51,41 @@ export default {
       return variables
     }
   },
+  created() {
+    this.notifyPendingRegistrations()
+  },
   methods: {
+    notifyPendingRegistrations() {
+      const roles = this.$store.getters.roles || []
+      if (!roles.includes('admin') && !roles.includes('manager')) {
+        return
+      }
+      const reminderKey = 'pendingApprovalReminderShown'
+      if (sessionStorage.getItem(reminderKey)) {
+        return
+      }
+      sessionStorage.setItem(reminderKey, '1')
+      getPendingApprovalCount().then(response => {
+        const count = Number(response.data || 0)
+        if (count < 1) {
+          return
+        }
+        if (roles.includes('admin')) {
+          this.$confirm(`当前有 ${count} 个用户注册申请待审批，是否现在处理？`, '待审批提醒', {
+            confirmButtonText: '去审批',
+            cancelButtonText: '稍后处理',
+            type: 'warning'
+          }).then(() => {
+            this.$router.push({ path: '/users', query: { approvalStatus: '0' } })
+          }).catch(() => {})
+        } else {
+          this.$alert(`当前有 ${count} 个用户注册申请待审批，请提醒超级管理员及时处理。`, '待审批提醒', {
+            confirmButtonText: '知道了',
+            type: 'warning'
+          }).catch(() => {})
+        }
+      }).catch(() => {})
+    },
     handleClickOutside() {
       this.$store.dispatch('app/closeSideBar', { withoutAnimation: false })
     },

@@ -48,6 +48,7 @@ nbdist/
 
 # 本地临时文件
 .codex_tmp/
+.codex-docx-review/
 
 # Redis 本地数据
 dump.rdb

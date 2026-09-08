@@ -170,7 +170,23 @@
     .el-menu--collapse {
       .el-submenu {
         &>.el-submenu__title {
-          &>span {
+          &>.submenu-title-content {
+            height: auto !important;
+            width: auto !important;
+            overflow: visible !important;
+            visibility: visible !important;
+            display: inline-block !important;
+
+            &>span {
+              height: 0;
+              width: 0;
+              overflow: hidden;
+              visibility: hidden;
+              display: inline-block;
+            }
+          }
+
+          &>span:not(.submenu-title-content) {
             height: 0;
             width: 0;
             overflow: hidden;

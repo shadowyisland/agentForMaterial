@@ -1,0 +1,124 @@
+# Production overrides loaded from /opt/agentForMaterial/config/application-prod.yml.
+# Keep real secrets in /etc/default/agent-material and reference them through
+# environment variables instead of committing them to the repository.
+
+ruoyi:
+  profile: ${RUOYI_PROFILE:/opt/agentForMaterial/uploadPath}
+  addressEnabled: false
+
+server:
+  port: ${SERVER_PORT:8080}
+  servlet:
+    context-path: /
+
+logging:
+  level:
+    com.ruoyi: info
+    org.springframework: warn
+
+spring:
+  servlet:
+    multipart:
+      max-file-size: ${MAX_FILE_SIZE:10MB}
+      max-request-size: ${MAX_REQUEST_SIZE:20MB}
+  devtools:
+    restart:
+      enabled: false
+  redis:
+    host: ${REDIS_HOST:127.0.0.1}
+    port: ${REDIS_PORT:6379}
+    database: ${REDIS_DATABASE:0}
+    password: "${REDIS_PASSWORD:}"
+    timeout: 10s
+    lettuce:
+      pool:
+        min-idle: 0
+        max-idle: 8
+        max-active: 8
+        max-wait: -1ms
+  datasource:
+    type: com.alibaba.druid.pool.DruidDataSource
+    driverClassName: com.mysql.cj.jdbc.Driver
+    druid:
+      master:
+        url: ${DB_URL:jdbc:mysql://127.0.0.1:3306/aiforscience?useUnicode=true&characterEncoding=utf8&zeroDateTimeBehavior=convertToNull&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai}
+        username: ${DB_USERNAME:aiforscience}
+        password: ${DB_PASSWORD:change_me}
+      slave:
+        enabled: false
+        url:
+        username:
+        password:
+      initialSize: 5
+      minIdle: 10
+      maxActive: 20
+      maxWait: 60000
+      connectTimeout: 30000
+      socketTimeout: 60000
+      timeBetweenEvictionRunsMillis: 60000
+      minEvictableIdleTimeMillis: 300000
+      maxEvictableIdleTimeMillis: 900000
+      validationQuery: SELECT 1 FROM DUAL
+      testWhileIdle: true
+      testOnBorrow: false
+      testOnReturn: false
+      webStatFilter:
+        enabled: true
+      statViewServlet:
+        enabled: true
+        allow: 127.0.0.1
+        url-pattern: /druid/*
+        login-username: ${DRUID_USERNAME:ruoyi}
+        login-password: ${DRUID_PASSWORD:change_me}
+      filter:
+        stat:
+          enabled: true
+          log-slow-sql: true
+          slow-sql-millis: 1000
+          merge-sql: true
+        wall:
+          config:
+            multi-statement-allow: true
+
+token:
+  secret: ${TOKEN_SECRET:change_me_to_a_long_random_secret}
+  expireTime: ${TOKEN_EXPIRE_MINUTES:30}
+
+swagger:
+  enabled: false
+  pathMapping: /prod-api
+
+referer:
+  enabled: false
+  allowed-domains: ${ALLOWED_DOMAINS:localhost,127.0.0.1}
+
+baidu:
+  api:
+    key: ${BAIDU_API_KEY:}
+    secret: ${BAIDU_API_SECRET:}
+
+# 服务器部署时 Redis、MinerU 和 Qwen 都直接连接服务器本机服务，不需要 SSH 转发。
+# 如服务运行在容器或其它主机上，可通过 /etc/default/agent-material 中的环境变量覆盖。
+file:
+  parse:
+    api:
+      url: ${MINERU_API_URL:http://127.0.0.1:8001}
+      connectTimeout: ${MINERU_CONNECT_TIMEOUT:30000}
+      responseTimeout: ${MINERU_RESPONSE_TIMEOUT:300000}
+
+llm:
+  qwen:
+    base-url: ${QWEN_BASE_URL:http://127.0.0.1:8081/v1}
+    model: ${QWEN_MODEL:qwen3.8-27b}
+    connect-timeout: ${QWEN_CONNECT_TIMEOUT:30000}
+    response-timeout: ${QWEN_RESPONSE_TIMEOUT:300000}
+    temperature: ${QWEN_TEMPERATURE:0}
+    max-tokens: ${QWEN_MAX_TOKENS:262144}
+
+aliyun:
+  oss:
+    file:
+      endpoint: ${ALIYUN_OSS_ENDPOINT:oss-cn-shanghai.aliyuncs.com}
+      keyid: ${ALIYUN_OSS_KEY_ID:}
+      keysecret: ${ALIYUN_OSS_KEY_SECRET:}
+      bucketname: ${ALIYUN_OSS_BUCKET:kkmaterial1}
