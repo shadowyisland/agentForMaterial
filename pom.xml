@@ -68,6 +68,13 @@
                 <scope>import</scope>
             </dependency>
 
+            <!-- MinIO 8.5.12 依赖 OkHttp 4，覆盖 Spring Boot 2.5 默认的 OkHttp 3。 -->
+            <dependency>
+                <groupId>com.squareup.okhttp3</groupId>
+                <artifactId>okhttp</artifactId>
+                <version>4.12.0</version>
+            </dependency>
+
             <!-- 覆盖logback的依赖配置-->
             <dependency>
                 <groupId>ch.qos.logback</groupId>

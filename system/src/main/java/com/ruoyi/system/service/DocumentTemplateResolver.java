@@ -18,6 +18,7 @@ import com.ruoyi.system.constant.DocumentConstants;
 public class DocumentTemplateResolver
 {
     private static final String MSDS_TEMPLATE = "templates/document/msds/MSDS-COMMON.docx";
+    private static final String FILLER_MSDS_TEMPLATE = "templates/document/msds/MSDS-FILLER.docx";
 
     private static final Map<String, String> TDS_TEMPLATES;
 
@@ -37,7 +38,7 @@ public class DocumentTemplateResolver
     {
         if (DocumentConstants.KIND_MSDS.equals(documentKind))
         {
-            return loadTemplate(MSDS_TEMPLATE);
+            return loadTemplate("FILLER".equals(materialCategory) ? FILLER_MSDS_TEMPLATE : MSDS_TEMPLATE);
         }
         if (!DocumentConstants.KIND_TDS.equals(documentKind))
         {

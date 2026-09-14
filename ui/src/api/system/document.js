@@ -34,6 +34,24 @@ export function previewUploadedPage(documentId, page) {
   })
 }
 
+// 查询当前上传文件经 MinerU 解析后保存到 MinIO 的图片。
+export function listMineruImages(documentId) {
+  return request({
+    url: '/system/document/' + documentId + '/mineru-images',
+    method: 'get'
+  })
+}
+
+// 通过后端代理读取当前上传文件的一张 MinerU 图片。
+export function readMineruImage(documentId, imageId) {
+  return request({
+    url: '/system/document/' + documentId + '/mineru-images/' + imageId + '/content',
+    method: 'get',
+    responseType: 'blob',
+    timeout: 60000
+  })
+}
+
 // 查询文档管理列表
 export function listDocument(query) {
   return request({

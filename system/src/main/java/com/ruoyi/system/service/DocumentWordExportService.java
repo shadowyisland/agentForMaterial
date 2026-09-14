@@ -13,8 +13,6 @@ import org.apache.poi.util.Units;
 import org.apache.poi.xwpf.usermodel.XWPFDocument;
 import org.apache.poi.xwpf.usermodel.XWPFParagraph;
 import org.apache.poi.xwpf.usermodel.XWPFRun;
-import org.w3c.dom.Element;
-import org.w3c.dom.Node;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
@@ -33,9 +31,17 @@ import com.ruoyi.system.domain.SysDocument;
 public class DocumentWordExportService
 {
     private static final String STRUCTURE_IMAGE = "{{@分子结构}}";
+    private static final String PICTOGRAM_IMAGE = "{{@象形图}}";
+    private static final String PERSONAL_PROTECTION_IMAGE = "{{@个人防护装备总要求}}";
+    private static final String TRANSPORT_LABEL_IMAGE = "{{@运输标签}}";
+    /** 2.05cm，图片宽度根据原始纵横比自动计算。 */
+    private static final double IMAGE_FIXED_HEIGHT_POINTS = 72.0 * 2.05 / 2.54;
 
     @Autowired
     private DocumentTemplateResolver documentTemplateResolver;
+
+    @Autowired
+    private DocumentMineruImageService documentMineruImageService;
 
     public void writeDocument(SysDocument document, String finalJson, OutputStream outputStream)
     {
@@ -45,18 +51,18 @@ public class DocumentWordExportService
         root.putIfAbsent("产品名称", StringUtils.defaultString(document.getProductName()));
         root.put("产品型号", StringUtils.defaultString(document.getProductModel()));
         root.put("内部编号", StringUtils.defaultString(document.getInternalCode()));
+        normalizeMsds(document, root);
         normalizeFillerSolventRows(document, root);
         try (InputStream input = template.getInputStream())
         {
             DocumentWordTemplateRenderer renderer = new DocumentWordTemplateRenderer();
             JSONArray images = root.getJSONArray("图片");
-            if ("EPOXY".equals(document.getMaterialCategory()) && "TDS".equals(document.getDocumentKind())
-                    && images != null && !images.isEmpty())
+            if (images != null && !images.isEmpty())
             {
                 // 图片先写入专用标记所在段落，再渲染文字，避免按标题插入时改变位置。
                 try (XWPFDocument word = new XWPFDocument(input))
                 {
-                    insertStructureImage(word, images);
+                    insertSelectedImages(document, word, images);
                     ByteArrayOutputStream buffer = new ByteArrayOutputStream();
                     word.write(buffer);
                     renderer.render(new ByteArrayInputStream(buffer.toByteArray()), root, outputStream);
@@ -109,6 +115,103 @@ public class DocumentWordExportService
         }
     }
 
+    /** MSDS 模板直接使用法规章节层级；这里只处理网页数组和固定 Word 表格行之间的映射。 */
+    private void normalizeMsds(SysDocument document, JSONObject root)
+    {
+        if (!"MSDS".equals(document.getDocumentKind())) return;
+        JSONObject section1 = root.getJSONObject("第1部分 物质或混合物和供应商的标识");
+        if (section1 == null)
+        {
+            // 兼容历史解析结果：旧记录将第 1 部分字段直接放在根节点。
+            section1 = new JSONObject();
+            String[] section1Keys = { "产品中文名称", "产品英文名称", "产品编号", "CAS No.", "EC No.", "分子式",
+                    "REACH注册号", "UFI", "产品的推荐用途", "产品的限制用途", "企业名称", "企业地址", "邮编",
+                    "联系电话", "电子邮箱", "应急电话", "响应时间" };
+            for (String key : section1Keys)
+            {
+                if (root.containsKey(key)) section1.put(key, root.get(key));
+            }
+            root.put("第1部分 物质或混合物和供应商的标识", section1);
+        }
+        String[] section1Keys = { "产品中文名称", "产品英文名称", "产品编号", "CAS No.", "EC No.", "分子式",
+                "REACH注册号", "UFI", "产品的推荐用途", "产品的限制用途", "企业名称", "企业地址", "邮编",
+                "联系电话", "电子邮箱", "应急电话", "响应时间" };
+        for (String key : section1Keys)
+        {
+            if (!section1.containsKey(key) && root.containsKey(key)) section1.put(key, root.get(key));
+        }
+        for (String key : section1.keySet()) root.putIfAbsent(key, section1.get(key));
+        JSONObject section4 = root.getJSONObject("第4部分 急救措施");
+        if (section4 != null)
+        {
+            // 网页编辑器把急救措施维护为“类别/内容”数组，原始 Word 是固定类别的表格行。
+            // 在下载前补上同名字段，表格即可保留标准模板的行、边框和顺序。
+            copyCategoryContents(section4, "急救措施描述");
+        }
+        JSONObject section5 = root.getJSONObject("第5部分 消防措施");
+        if (section5 != null)
+        {
+            copyCategoryContents(section5, "灭火介质");
+        }
+        JSONObject section2 = root.getJSONObject("第2部分 危险标识");
+        if (section2 != null)
+        {
+            JSONArray classifications = section2.getJSONArray("依据欧盟 CLP 法规[（EC）No 1272/2008]的危险性分类");
+            if (onlyNoDataClassifications(classifications))
+            {
+                // “无数据资料”不是危险性分类，空表不应在成品中保留。
+                section2.put("依据欧盟 CLP 法规[（EC）No 1272/2008]的危险性分类", new JSONArray());
+            }
+        }
+        JSONObject section16 = root.getJSONObject("第16部分 其他信息");
+        if (section16 == null) section16 = new JSONObject();
+        section16.putIfAbsent("编制日期", root.get("编制日期"));
+        section16.putIfAbsent("修订日期", root.get("修订日期"));
+        root.put("第16部分 其他信息", section16);
+    }
+
+    private boolean onlyNoDataClassifications(JSONArray values)
+    {
+        if (values == null || values.isEmpty())
+        {
+            return false;
+        }
+        for (int i = 0; i < values.size(); i++)
+        {
+            JSONObject value = values.getJSONObject(i);
+            String category = value == null ? null : value.getString("分类");
+            if (!StringUtils.isEmpty(category) && !"无数据资料".equals(category) && !"无资料".equals(category)
+                    && !"不适用".equals(category))
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private void copyCategoryContents(JSONObject section, String arrayName)
+    {
+        JSONArray values = section.getJSONArray(arrayName);
+        if (values == null)
+        {
+            return;
+        }
+        for (int i = 0; i < values.size(); i++)
+        {
+            JSONObject value = values.getJSONObject(i);
+            if (value == null)
+            {
+                continue;
+            }
+            String category = value.getString("类别");
+            if (StringUtils.isEmpty(category))
+            {
+                continue;
+            }
+            section.putIfAbsent(category, StringUtils.defaultString(value.getString("内容")));
+        }
+    }
+
     private JSONObject parseJson(String finalJson)
     {
         try
@@ -130,56 +233,80 @@ public class DocumentWordExportService
         }
     }
 
-    private void insertStructureImage(XWPFDocument word, JSONArray images)
+    private void insertSelectedImages(SysDocument document, XWPFDocument word, JSONArray images)
     {
         for (int i = 0; i < images.size(); i++)
         {
             JSONObject image = images.getJSONObject(i);
-            if (image == null || StringUtils.isEmpty(image.getString("路径"))
-                    || !"分子结构后".equals(image.getString("位置")))
+            if (image == null
+                    || (StringUtils.isEmpty(image.getString("路径")) && StringUtils.isEmpty(image.getString("图片ID"))))
             {
                 continue;
             }
-            for (XWPFParagraph paragraph : word.getParagraphs())
+            String marker = imageMarker(image);
+            if (marker == null)
             {
-                if (STRUCTURE_IMAGE.equals(paragraph.getText().trim()))
+                continue;
+            }
+            for (XWPFParagraph paragraph : allParagraphs(word))
+            {
+                if (marker.equals(paragraph.getText().trim()))
                 {
-                    addPicture(word, paragraph, image.getString("路径"), image.getString("名称"));
-                    return;
+                    addPicture(document, word, paragraph, image);
+                    break;
                 }
             }
-            throw new ServiceException("Word 模板缺少分子结构图片标记");
         }
     }
 
-    private void addPicture(XWPFDocument word, XWPFParagraph paragraph, String path, String pictureName)
+    private String imageMarker(JSONObject image)
     {
-        File imageFile = resolveImageFile(path);
-        if (!imageFile.isFile())
+        String type = image.getString("类型");
+        if ("分子结构".equals(type) || "分子结构后".equals(image.getString("位置"))) return STRUCTURE_IMAGE;
+        if ("象形图".equals(type)) return PICTOGRAM_IMAGE;
+        if ("个人防护装备总要求".equals(type)) return PERSONAL_PROTECTION_IMAGE;
+        if ("运输标签".equals(type)) return TRANSPORT_LABEL_IMAGE;
+        return null;
+    }
+
+    private java.util.List<XWPFParagraph> allParagraphs(XWPFDocument word)
+    {
+        java.util.List<XWPFParagraph> paragraphs = new java.util.ArrayList<XWPFParagraph>(word.getParagraphs());
+        collectTableParagraphs(word.getTables(), paragraphs);
+        return paragraphs;
+    }
+
+    private void collectTableParagraphs(java.util.List<org.apache.poi.xwpf.usermodel.XWPFTable> tables,
+            java.util.List<XWPFParagraph> paragraphs)
+    {
+        for (org.apache.poi.xwpf.usermodel.XWPFTable table : tables)
+            for (org.apache.poi.xwpf.usermodel.XWPFTableRow row : table.getRows())
+                for (org.apache.poi.xwpf.usermodel.XWPFTableCell cell : row.getTableCells())
+                {
+                    paragraphs.addAll(cell.getParagraphs());
+                    collectTableParagraphs(cell.getTables(), paragraphs);
+                }
+    }
+
+    private void addPicture(SysDocument document, XWPFDocument word, XWPFParagraph paragraph, JSONObject imageItem)
+    {
+        String pictureName = imageItem.getString("名称");
+        byte[] imageBytes = readImageBytes(document, imageItem);
+        try (InputStream inputStream = new ByteArrayInputStream(imageBytes))
         {
-            throw new ServiceException("图片文件不存在: " + path);
-        }
-        try (InputStream inputStream = new FileInputStream(imageFile))
-        {
-            BufferedImage image = ImageIO.read(imageFile);
+            BufferedImage image = ImageIO.read(new ByteArrayInputStream(imageBytes));
             if (image == null)
             {
-                throw new ServiceException("图片格式不正确: " + imageFile.getName());
+                throw new ServiceException("图片格式不正确: " + pictureName);
             }
-            Node section = word.getDocument().getBody().getSectPr().getDomNode();
-            double availableWidth = sectionValue(section, "pgSz", "w", 12240)
-                    - sectionValue(section, "pgMar", "left", 1440) - sectionValue(section, "pgMar", "right", 1440);
-            double columns = sectionValue(section, "cols", "num", 1);
-            double gap = sectionValue(section, "cols", "space", 0);
-            // Units.toEMU 使用磅，1 磅 = 20 twip；图片还需扣除段落左右缩进。
-            double widthLimit = ((availableWidth - (columns - 1) * gap) / columns
-                    - Math.max(0, paragraph.getIndentationLeft()) - Math.max(0, paragraph.getIndentationRight())) / 20.0;
-            double scale = Math.min(widthLimit / image.getWidth(), 270.0 / image.getHeight());
+            // 图片可能来自 MinIO 或本地上传，但最终都必须按组件尺寸插入。
+            // 与 Word 的“锁定纵横比”一致：单张图片高度固定 2.05cm，宽度随原图比例变化。
+            double scale = IMAGE_FIXED_HEIGHT_POINTS / image.getHeight();
             double width = image.getWidth() * scale;
-            double height = image.getHeight() * scale;
+            double height = IMAGE_FIXED_HEIGHT_POINTS;
             XWPFRun run = paragraph.createRun();
-            run.addPicture(inputStream, getPictureType(imageFile.getName()),
-                    StringUtils.isEmpty(pictureName) ? imageFile.getName() : pictureName,
+            String name = StringUtils.isEmpty(pictureName) ? "image.png" : pictureName;
+            run.addPicture(inputStream, getPictureType(name), name,
                     Units.toEMU(width), Units.toEMU(height));
         }
         catch (ServiceException e)
@@ -192,19 +319,34 @@ public class DocumentWordExportService
         }
     }
 
-    private double sectionValue(Node section, String name, String attribute, double defaultValue)
+    private byte[] readImageBytes(SysDocument document, JSONObject imageItem)
     {
-        // 直接读取 OOXML，避免为页面属性额外引入完整的 POI schema 包。
-        for (Node child = section.getFirstChild(); child != null; child = child.getNextSibling())
+        String imageId = imageItem.getString("图片ID");
+        if (StringUtils.isNotEmpty(imageId))
         {
-            if (child instanceof Element && name.equals(child.getLocalName()))
-            {
-                String value = ((Element) child).getAttributeNS(
-                        "http://schemas.openxmlformats.org/wordprocessingml/2006/main", attribute);
-                return value.isEmpty() ? defaultValue : Double.parseDouble(value);
-            }
+            return documentMineruImageService.readImage(document, imageId);
         }
-        return defaultValue;
+        String path = imageItem.getString("路径");
+        File imageFile = resolveImageFile(path);
+        if (!imageFile.isFile())
+        {
+            throw new ServiceException("图片文件不存在: " + path);
+        }
+        try (InputStream inputStream = new FileInputStream(imageFile))
+        {
+            ByteArrayOutputStream output = new ByteArrayOutputStream();
+            byte[] buffer = new byte[8192];
+            int length;
+            while ((length = inputStream.read(buffer)) != -1)
+            {
+                output.write(buffer, 0, length);
+            }
+            return output.toByteArray();
+        }
+        catch (Exception e)
+        {
+            throw new ServiceException("读取图片失败: " + e.getMessage());
+        }
     }
 
     private File resolveImageFile(String path)

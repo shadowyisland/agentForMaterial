@@ -1,39 +1,22 @@
 <template>
   <el-form v-if="value" label-position="top" class="extract-editor">
-    <section v-if="isEpoxyTds" class="editor-section image-section">
-      <div class="editor-section-title">
-        <i class="el-icon-picture-outline" /> 分子结构
-      </div>
-      <el-upload
-        :action="uploadUrl"
-        :headers="headers"
-        list-type="picture-card"
-        :file-list="structureImageFileList"
-        :on-success="handleStructureImageSuccess"
-        :on-remove="removeImage"
-        :on-preview="previewImage"
-        :limit="1"
-        accept="image/png,image/jpeg,image/jpg"
-      >
-        <i class="el-icon-plus" />
-      </el-upload>
-      <el-empty
-        v-if="!structureImage"
-        description="请上传分子结构图片"
-        :image-size="54"
-      />
-      <p class="section-hint">
-        分子结构图片不会由 AI 生成，下载 Word 时会插入“分子结构”标题后。
-      </p>
-    </section>
-
     <section
       v-for="section in orderedSections"
       :key="section.key"
       class="editor-section"
     >
-      <div class="editor-section-title">
+      <template v-if="section.type === 'image'">
+        <div v-for="field in section.fields" :key="field.type" class="image-section">
+          <div class="editor-section-title"><i class="el-icon-picture-outline" /> {{ field.title }}</div>
+          <div class="image-source-actions"><el-button type="primary" plain icon="el-icon-folder-opened" :disabled="!documentId" @click="openMineruImagePicker(field)">从当前文件选择</el-button><span>或本地上传</span></div>
+          <el-upload :action="uploadUrl" :headers="headers" list-type="picture-card" :file-list="imageFileList(field)" :on-success="(res, file) => handleImageSuccess(res, file, field)" :on-remove="() => removeImage(field)" :on-preview="previewImage" :limit="1" accept="image/png,image/jpeg,image/jpg"><i class="el-icon-plus" /></el-upload>
+          <el-empty v-if="!imageByType(field.type)" :description="'请从当前文件选择或本地上传' + field.title + '图片'" :image-size="54" />
+          <p class="section-hint">当前文件的 MinerU 解析图片已保存至 MinIO；下载 Word 时会插入对应位置。</p>
+        </div>
+      </template>
+      <div v-else class="editor-section-title">
         <i :class="sectionIcon(section.type)" /> {{ section.key }}
+        <el-button v-if="section.type === 'text'" type="text" class="danger-text" icon="el-icon-delete" title="删除此组件" @click="removeRootComponent(section.key)" />
       </div>
 
       <template v-if="section.type === 'text'">
@@ -241,6 +224,26 @@
         </template>
       </template>
 
+      <template v-else-if="section.type === 'object' && isMsds">
+        <template v-for="item in orderedObjectItems(section.value)">
+          <div v-if="item.type === 'array'" :key="item.path.join('.')" class="nested-table-block">
+            <div class="nested-table-title"><strong>{{ item.path.join(' / ') }}</strong><el-button type="text" size="mini" icon="el-icon-plus" @click="addObjectArrayItem(item.value, [section.key].concat(item.path))">新增行</el-button><el-button type="text" size="mini" class="danger-text" @click="removeArrayParameter(getParentByPath(section.value, item.path), item.path[item.path.length - 1], [section.key].concat(item.path))">删除参数</el-button></div>
+            <el-table :data="item.value" border size="small" class="specification-table" :row-class-name="tableRowClass">
+              <el-table-column v-for="column in arrayColumns(item.value)" :key="column" :label="column" min-width="130"><template slot-scope="scope"><el-input :value="getArrayColumnValue(scope.row, column)" @input="setArrayColumnValue(item.value, scope.$index, column, $event)" /></template></el-table-column>
+              <el-table-column label="操作" width="54" align="center"><template slot-scope="scope"><el-button type="text" class="row-delete" @click="item.value.splice(scope.$index, 1)">×</el-button></template></el-table-column>
+            </el-table>
+          </div>
+          <el-form-item v-else :key="item.path.join('.')" :label="item.path.join(' / ')" class="msds-single-field">
+            <el-button type="text" class="field-delete danger-text" icon="el-icon-delete" title="删除此字段" @click="removeObjectField(section.value, item.path, [section.key].concat(item.path))" />
+            <template v-if="imageFieldForPath(section.key, item.path)">
+              <div class="image-source-actions"><el-button type="primary" plain icon="el-icon-folder-opened" :disabled="!documentId" @click="openMineruImagePicker(imageFieldForPath(section.key, item.path))">从当前文件选择</el-button><span>或本地上传</span></div>
+              <el-upload :action="uploadUrl" :headers="headers" list-type="picture-card" :file-list="imageFileList(imageFieldForPath(section.key, item.path))" :on-success="(res, file) => handleImageSuccess(res, file, imageFieldForPath(section.key, item.path))" :on-remove="(file) => removeImage(imageFieldForPath(section.key, item.path), file)" :on-preview="previewImage" accept="image/png,image/jpeg,image/jpg"><i class="el-icon-plus" /></el-upload>
+            </template>
+            <el-input v-else :value="item.value" :type="item.long ? 'textarea' : 'text'" :rows="item.long ? 4 : 1" @input="setByPath(section.value, item.path, $event)" />
+          </el-form-item>
+        </template>
+      </template>
+
       <template v-else-if="section.type === 'object'">
         <el-row :gutter="16">
           <el-col
@@ -250,7 +253,12 @@
             :sm="leaf.long ? 24 : 12"
           >
             <el-form-item :label="leaf.path.join(' / ')">
-              <el-input
+              <el-button type="text" class="field-delete danger-text" icon="el-icon-delete" title="删除此字段" @click="removeObjectField(section.value, leaf.path, [section.key].concat(leaf.path))" />
+              <template v-if="imageFieldForPath(section.key, leaf.path)">
+                <div class="image-source-actions"><el-button type="primary" plain icon="el-icon-folder-opened" :disabled="!documentId" @click="openMineruImagePicker(imageFieldForPath(section.key, leaf.path))">从当前文件选择</el-button><span>或本地上传</span></div>
+                <el-upload :action="uploadUrl" :headers="headers" list-type="picture-card" :file-list="imageFileList(imageFieldForPath(section.key, leaf.path))" :on-success="(res, file) => handleImageSuccess(res, file, imageFieldForPath(section.key, leaf.path))" :on-remove="(file) => removeImage(imageFieldForPath(section.key, leaf.path), file)" :on-preview="previewImage" accept="image/png,image/jpeg,image/jpg"><i class="el-icon-plus" /></el-upload>
+              </template>
+              <el-input v-else
                 :value="leaf.value"
                 :type="leaf.long ? 'textarea' : 'text'"
                 :rows="leaf.long ? 4 : 1"
@@ -323,6 +331,47 @@
     </section>
 
     <el-dialog
+      :visible.sync="mineruImagePickerOpen"
+      append-to-body
+      title="从当前文件选择图片"
+      width="900px"
+      class="mineru-image-picker"
+    >
+      <div class="mineru-image-context">
+        <strong>当前上传文件</strong>
+        <span>{{ currentDocumentName || "当前文件" }}</span>
+        <small>以下图片由 MinerU 解析后保存至 MinIO</small>
+      </div>
+      <div v-loading="mineruImageLoading" class="mineru-image-grid">
+        <button
+          v-for="image in mineruImages"
+          :key="image.imageId"
+          type="button"
+          class="mineru-image-card"
+          :class="{ selected: selectedMineruImageIds.includes(image.imageId) }"
+          @click="toggleMineruImage(image.imageId)"
+        >
+          <img :src="image.previewUrl" :alt="image.name" />
+          <i v-if="selectedMineruImageIds.includes(image.imageId)" class="el-icon-check" />
+          <span>{{ image.name }}</span>
+        </button>
+        <el-empty
+          v-if="!mineruImageLoading && !mineruImages.length"
+          description="当前上传文件没有可用的 MinerU 解析图片"
+          :image-size="64"
+        />
+      </div>
+      <div slot="footer" class="dialog-footer">
+        <el-button @click="mineruImagePickerOpen = false">取消</el-button>
+        <el-button
+          type="primary"
+          :disabled="!selectedMineruImageIds.length"
+          @click="useSelectedMineruImage"
+        >确认使用</el-button>
+      </div>
+    </el-dialog>
+
+    <el-dialog
       :visible.sync="previewOpen"
       append-to-body
       title="图片预览"
@@ -335,6 +384,7 @@
 
 <script>
 import { getToken } from "@/utils/auth";
+import { listMineruImages, readMineruImage } from "@/api/system/document";
 import { createExtractTemplate, DELETED_ROWS_KEY } from "./templateDefaults";
 
 const LONG_FIELD_NAMES = [
@@ -376,6 +426,14 @@ export default {
       type: String,
       default: "",
     },
+    documentId: {
+      type: [Number, String],
+      default: null,
+    },
+    currentDocumentName: {
+      type: String,
+      default: "",
+    },
   },
   data() {
     return {
@@ -385,6 +443,12 @@ export default {
       },
       previewOpen: false,
       previewUrl: "",
+      mineruImagePickerOpen: false,
+      mineruImageLoading: false,
+      mineruImages: [],
+      selectedMineruImageIds: [],
+      activeImageField: null,
+      mineruPreviewUrls: {},
     };
   },
   computed: {
@@ -392,7 +456,7 @@ export default {
       return createExtractTemplate(this.materialCategory, this.documentKind);
     },
     orderedSections() {
-      return Object.keys(this.value)
+      const sections = Object.keys(this.value)
         .filter((key) => key !== "图片" && key !== DELETED_ROWS_KEY)
         .map((key) => ({
           key,
@@ -402,12 +466,29 @@ export default {
             LONG_FIELD_NAMES.includes(key) ||
             String(this.value[key] || "").length > 80,
         }));
+      const result = [];
+      sections.forEach((section) => {
+        result.push(section);
+        const fields = this.isMsds ? [] : this.imageFields.filter((field) => field.after === section.key);
+        if (fields.length) result.push({ key: section.key + '-图片', type: 'image', fields });
+      });
+      return result;
     },
     images() {
       return Array.isArray(this.value.图片) ? this.value.图片 : [];
     },
     isEpoxyTds() {
       return this.materialCategory === "EPOXY" && this.documentKind === "TDS";
+    },
+    isMsds() { return this.documentKind === "MSDS"; },
+    imageFields() {
+      if (this.isEpoxyTds) return [{ type: "分子结构", title: "分子结构", position: "分子结构后", after: "组分及结构式" }];
+      if (!this.isMsds) return [];
+      return [
+        { type: "象形图", title: "象形图", position: "第2部分标签要素", path: "第2部分 危险标识.标签要素.象形图" },
+        { type: "个人防护装备总要求", title: "个人防护装备总要求", position: "第8部分个人防护装备", path: "第8部分 接触控制/个体防护.接触控制.个人防护装备.总要求" },
+        { type: "运输标签", title: "运输标签", position: "第14部分标签和标记", path: "第14部分 运输信息.运输标签" },
+      ];
     },
     isFillerTds() {
       return this.materialCategory === "FILLER" && this.documentKind === "TDS";
@@ -428,9 +509,96 @@ export default {
     toUploadFile(image, index) {
       return {
         name: image.名称 || "图片" + (index + 1),
-        url: this.imageUrl(image.路径),
-        uid: image.路径 + index,
+        url: this.structureImageUrl(image),
+        uid: (image.图片ID || image.路径 || image.名称 || "image") + index,
       };
+    },
+    async openMineruImagePicker(field) {
+      if (!this.documentId) return;
+      this.activeImageField = field || this.imageFields[0];
+      this.mineruImagePickerOpen = true;
+      this.selectedMineruImageIds = this.images.filter((image) => image.类型 === this.activeImageField.type && image.图片ID).map((image) => image.图片ID);
+      this.mineruImageLoading = true;
+      try {
+        const response = await listMineruImages(this.documentId);
+        const images = response.data || [];
+        this.mineruImages = await Promise.all(
+          images.map(async (image) => ({
+            ...image,
+            previewUrl: await this.loadMineruImageUrl(image.imageId),
+          }))
+        );
+      } catch (error) {
+        this.mineruImages = [];
+        this.$modal.msgError("加载当前文件解析图片失败");
+      } finally {
+        this.mineruImageLoading = false;
+      }
+    },
+    async loadMineruImageUrl(imageId) {
+      if (this.mineruPreviewUrls[imageId]) return this.mineruPreviewUrls[imageId];
+      const blob = await readMineruImage(this.documentId, imageId);
+      const url = URL.createObjectURL(blob);
+      this.$set(this.mineruPreviewUrls, imageId, url);
+      return url;
+    },
+    async ensureStructureImagePreview() {
+      if (!(this.structureImage && this.structureImage.图片ID) || !this.documentId) return;
+      try {
+        await this.loadMineruImageUrl(this.structureImage.图片ID);
+      } catch (error) {
+        this.$modal.msgError("加载已选 MinerU 图片失败");
+      }
+    },
+    async ensureSelectedImagePreviews() {
+      for (const image of this.images) {
+        if (image.图片ID && this.documentId) await this.loadMineruImageUrl(image.图片ID);
+      }
+    },
+    structureImageUrl(image) {
+      return image && image.图片ID
+        ? this.mineruPreviewUrls[image.图片ID] || ""
+        : this.imageUrl(image && image.路径);
+    },
+    useSelectedMineruImage() {
+      const selected = this.mineruImages.filter((image) => this.selectedMineruImageIds.includes(image.imageId));
+      if (!selected.length) return;
+      const images = this.ensureImageList();
+      for (let index = images.length - 1; index >= 0; index--) {
+        if (images[index].类型 === this.activeImageField.type && images[index].图片ID) images.splice(index, 1);
+      }
+      selected.forEach((image) => images.push({ 名称: image.name, 类型: this.activeImageField.type, 位置: this.activeImageField.position, 来源: "MINERU", 图片ID: image.imageId }));
+      this.mineruImagePickerOpen = false;
+    },
+    toggleMineruImage(imageId) {
+      const index = this.selectedMineruImageIds.indexOf(imageId);
+      if (index >= 0) this.selectedMineruImageIds.splice(index, 1);
+      else this.selectedMineruImageIds.push(imageId);
+    },
+    releaseMineruPreviews() {
+      Object.keys(this.mineruPreviewUrls).forEach((imageId) => {
+        URL.revokeObjectURL(this.mineruPreviewUrls[imageId]);
+      });
+      this.mineruPreviewUrls = {};
+      this.mineruImages = [];
+    },
+    removeStructureImage() {
+      this.removeImage({ type: "分子结构" });
+    },
+    imageByType(type) { return this.images.find((image) => image.类型 === type); },
+    imageFieldForPath(sectionKey, path) {
+      const fullPath = [sectionKey].concat(path).join('.');
+      return this.imageFields.find((field) => field.path === fullPath);
+    },
+    imageFileList(field) {
+      return this.images.filter((image) => image.类型 === field.type).map((image, index) => this.toUploadFile(image, index));
+    },
+    removeImage(field, file) {
+      const images = this.ensureImageList();
+      for (let index = images.length - 1; index >= 0; index--) {
+        const image = images[index];
+        if (image.类型 === field.type && (!file || (image.图片ID || image.路径 || image.名称) + index === file.uid)) images.splice(index, 1);
+      }
     },
     isObject(value) {
       return value && typeof value === "object" && !Array.isArray(value);
@@ -478,6 +646,14 @@ export default {
     removeArrayParameter(parent, key, path) {
       this.$delete(parent, key);
       this.markDeletedRow(path);
+    },
+    removeObjectField(parent, path, deletedPath) {
+      this.$delete(this.getParentByPath(parent, path), path[path.length - 1]);
+      this.markDeletedRow(deletedPath);
+    },
+    removeRootComponent(key) {
+      this.$delete(this.value, key);
+      this.markDeletedRow([key]);
     },
     markDeletedRow(path) {
       const text = path.join(".");
@@ -621,6 +797,17 @@ export default {
       });
       return leaves;
     },
+    orderedObjectItems(object, prefix = []) {
+      const result = [];
+      Object.keys(object || {}).forEach((key) => {
+        const value = object[key];
+        const path = prefix.concat(key);
+        if (Array.isArray(value)) result.push({ type: 'array', path, value });
+        else if (this.isObject(value)) result.push(...this.orderedObjectItems(value, path));
+        else result.push({ type: 'leaf', path, value, long: this.isLongField(key, value) });
+      });
+      return result;
+    },
     objectArrays(object, prefix = []) {
       const arrays = [];
       Object.keys(object || {}).forEach((key) => {
@@ -657,27 +844,17 @@ export default {
       });
       this.$set(target, path[path.length - 1], value);
     },
-    handleStructureImageSuccess(res, file) {
+    handleImageSuccess(res, file, field) {
       if (res.code !== 200) {
         this.$modal.msgError(res.msg || "图片上传失败");
         return;
       }
-      const images = this.ensureImageList();
-      for (let index = images.length - 1; index >= 0; index--) {
-        if (images[index].类型 === "分子结构") images.splice(index, 1);
-      }
-      images.push({
-        名称: "分子结构",
-        类型: "分子结构",
-        位置: "分子结构后",
+      this.ensureImageList().push({
+        名称: field.title,
+        类型: field.type,
+        位置: field.position,
         路径: res.fileName,
       });
-    },
-    removeImage(file) {
-      const index = this.images.findIndex(
-        (image) => this.imageUrl(image.路径) === file.url
-      );
-      if (index >= 0) this.images.splice(index, 1);
     },
     ensureImageList() {
       if (!Array.isArray(this.value.图片)) this.$set(this.value, "图片", []);
@@ -694,6 +871,14 @@ export default {
         ? path
         : process.env.VUE_APP_BASE_API + path;
     },
+  },
+  mounted() {
+    this.ensureSelectedImagePreviews().catch(() => {
+      this.$modal.msgError("加载已选 MinerU 图片失败");
+    });
+  },
+  beforeDestroy() {
+    this.releaseMineruPreviews();
   },
 };
 </script>
@@ -778,6 +963,85 @@ export default {
   display: flex;
   align-items: center;
   margin-top: 12px;
+}
+.image-source-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+  color: #8492a6;
+  font-size: 13px;
+}
+.mineru-image-context {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 16px;
+  color: #4c6178;
+}
+.mineru-image-context strong {
+  color: #243b53;
+}
+.mineru-image-context small {
+  flex-basis: 100%;
+  color: #8492a6;
+}
+.mineru-image-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  min-height: 180px;
+}
+.mineru-image-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  min-width: 0;
+  padding: 8px;
+  overflow: hidden;
+  cursor: pointer;
+  border: 1px solid #dce6f0;
+  border-radius: 6px;
+  background: #fff;
+  color: #486078;
+  text-align: left;
+}
+.mineru-image-card:hover,
+.mineru-image-card.selected {
+  border-color: #2585db;
+  box-shadow: 0 0 0 2px rgba(37, 133, 219, 0.12);
+}
+.mineru-image-card img {
+  width: 100%;
+  height: 155px;
+  object-fit: contain;
+  background: #f7f9fc;
+}
+.mineru-image-card span {
+  display: block;
+  margin-top: 8px;
+  overflow: hidden;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mineru-image-card i {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: flex;
+  width: 22px;
+  height: 22px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: #2585db;
+  color: #fff;
+}
+.mineru-image-grid :deep(.el-empty) {
+  grid-column: 1 / -1;
 }
 .section-hint {
   margin: 14px 0 0;

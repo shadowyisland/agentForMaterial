@@ -2,6 +2,9 @@ package com.ruoyi.system.service;
 
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -18,6 +21,8 @@ import com.ruoyi.common.exception.ServiceException;
 @Service
 public class DocumentExtractPromptService
 {
+    private static final ZoneId CHINA_ZONE = ZoneId.of("Asia/Shanghai");
+    private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("yyyy/MM/dd");
     private final Map<DocumentExtractPrompt, String> promptCache = new ConcurrentHashMap<DocumentExtractPrompt, String>();
     private final PathMatchingResourcePatternResolver resolver = new PathMatchingResourcePatternResolver();
 
@@ -39,7 +44,8 @@ public class DocumentExtractPromptService
             throw new ServiceException("当前 " + materialCategory + " " + documentKind + " 提示词尚未配置");
         }
         // OCR 正文在 OpenAI-compatible 请求的 user 消息中单独传递。
-        return template.replace("{{ocrContent}}", "")
+        return template.replace("{{today}}", LocalDate.now(CHINA_ZONE).format(DATE_FORMAT))
+                .replace("{{ocrContent}}", "")
                 .replaceAll("(?s)\\s*OCR 文本如下：\\s*$", "");
     }
 

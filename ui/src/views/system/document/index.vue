@@ -381,7 +381,7 @@
           color="#2585db"
         />
         <span class="processing-elapsed">已等待 {{ processingElapsedText }}</span>
-        <strong>请耐心等待，若两分钟以上无反应，请刷新</strong>
+        <strong>请耐心等待，若五分钟以上无反应，请刷新</strong>
       </div>
     </el-dialog>
 
@@ -715,6 +715,8 @@
           :value="extractForm"
           :material-category="extractDocumentInfo.materialCategory"
           :document-kind="extractDocumentInfo.documentKind"
+          :document-id="extractDocumentInfo.documentId"
+          :current-document-name="extractDocumentInfo.fileOriginName || extractDocumentInfo.documentName"
         />
         <el-empty v-else description="暂无可编辑的解析结果" />
       </div>
@@ -1592,6 +1594,29 @@ export default {
 }
 .extract-dialog-actions .el-button {
   margin-left: 0;
+}
+::v-deep .extract-dialog {
+  display: flex;
+  flex-direction: column;
+  height: 92vh;
+  margin: 4vh auto !important;
+}
+::v-deep .extract-dialog .el-dialog__header {
+  flex: 0 0 auto;
+}
+::v-deep .extract-dialog .el-dialog__body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  padding: 18px 20px;
+  overflow: hidden;
+}
+.extract-dialog-body {
+  flex: 1;
+  min-height: 0;
+  padding-right: 10px;
+  overflow-x: hidden;
+  overflow-y: scroll;
 }
 .material-page {
   background: #f3f7fb;

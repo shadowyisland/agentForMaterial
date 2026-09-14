@@ -149,6 +149,12 @@ file:
       connectTimeout: ${MINERU_CONNECT_TIMEOUT:30000}
       responseTimeout: ${MINERU_RESPONSE_TIMEOUT:300000}
 
+minio:
+  endpoint: ${MINIO_ENDPOINT:http://127.0.0.1:9000}
+  access-key: ${MINIO_ACCESS_KEY:minioadmin}
+  secret-key: ${MINIO_SECRET_KEY:minioadmin}
+  bucket-name: ${MINIO_BUCKET:material}
+
 llm:
   qwen:
     # 本机默认连接 SSH 转发端口 18081；生产配置会覆盖为服务器本机的 8081

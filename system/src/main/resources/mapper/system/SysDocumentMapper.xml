@@ -24,6 +24,7 @@
         <result property="ocrContent"    column="ocr_content"    />
         <result property="ocrTime"       column="ocr_time"       />
         <result property="ocrError"      column="ocr_error"      />
+        <result property="mineruImages" column="mineru_images" />
         <result property="documentType"  column="document_type"  />
         <result property="materialCategory" column="material_category" />
         <result property="documentKind" column="document_kind" />
@@ -40,7 +41,7 @@
                d.file_path, d.file_origin_name, d.file_suffix, d.file_size, d.mime_type,
                d.document_type, d.material_category, d.document_kind, d.source_name, d.source_url, d.publish_date,
                d.create_user_id, d.create_by, d.create_time, d.update_by, d.update_time, d.remark,
-               d.is_recognized, d.ocr_content, d.ocr_time, d.ocr_error, d.status
+               d.is_recognized, d.ocr_content, d.ocr_time, d.ocr_error, d.mineru_images, d.status
         from sys_document d
     </sql>
 
@@ -195,6 +196,7 @@
             <if test="ocrContent != null">ocr_content = #{ocrContent},</if>
             <if test="ocrTime != null">ocr_time = #{ocrTime},</if>
             <if test="ocrError != null">ocr_error = #{ocrError},</if>
+            <if test="mineruImages != null">mineru_images = #{mineruImages},</if>
             <if test="updateBy != null">update_by = #{updateBy},</if>
             <if test="updateTime != null">update_time = #{updateTime},</if>
         </trim>

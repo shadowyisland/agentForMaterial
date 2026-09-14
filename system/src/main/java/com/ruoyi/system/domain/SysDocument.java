@@ -66,6 +66,9 @@ public class SysDocument extends BaseEntity {
     /** OCR失败原因 */
     private String ocrError;
 
+    /** MinerU 解析图片元数据（JSON） */
+    private String mineruImages;
+
     /** 文档类型：INTERNAL / EXTERNAL */
     private String documentType;
 
@@ -223,6 +226,14 @@ public class SysDocument extends BaseEntity {
 
     public void setOcrError(String ocrError) {
         this.ocrError = ocrError;
+    }
+
+    public String getMineruImages() {
+        return mineruImages;
+    }
+
+    public void setMineruImages(String mineruImages) {
+        this.mineruImages = mineruImages;
     }
 
     public String getStatus() {

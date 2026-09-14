@@ -491,6 +491,13 @@ export function createExtractTemplate(materialCategory, documentKind) {
 }
 
 export function mergeExtractTemplate(template, values) {
+  // MSDS 提示词本身就是与 Word 模板一致的完整结构。旧的前端默认结构仍是早期
+  // “危险概述/扁平急救措施”版本，会覆盖新提示词的数组对象，造成 AI 有值而页面为空。
+  if (values && Object.prototype.hasOwnProperty.call(values, "第2部分 危险标识")) {
+    const result = JSON.parse(JSON.stringify(values));
+    if (!Array.isArray(result.图片)) result.图片 = [];
+    return result;
+  }
   const result = mergeTemplate(template, values);
   // 助剂、填料的“主要特性”为单段文本；旧记录可能仍是数组，合并时保留内容并转为多行文本。
   if (template.主要特性 === "" && Array.isArray(result.主要特性)) {
@@ -523,6 +530,10 @@ function mergeTemplate(template, values) {
     const source = values && typeof values === "object" ? values : {};
     Object.keys(template).forEach((key) => {
       result[key] = mergeTemplate(template[key], source[key]);
+    });
+    // MSDS 使用完整的通用提示词结构；保留模版中尚未预置的字段，避免打开表单后丢失解析结果。
+    Object.keys(source).forEach((key) => {
+      if (!Object.prototype.hasOwnProperty.call(result, key)) result[key] = source[key];
     });
     return result;
   }

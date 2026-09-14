@@ -1,15 +1,20 @@
 package com.ruoyi.web.controller.system;
 
 import com.ruoyi.system.domain.dto.DocumentTagDto;
+import com.ruoyi.system.domain.DocumentMineruImage;
 import com.ruoyi.system.domain.SysDocumentExtract;
 import com.ruoyi.system.service.DocumentExtractService;
+import com.ruoyi.system.service.DocumentMineruImageService;
 import com.ruoyi.system.service.DocumentPreviewService;
 import com.ruoyi.system.service.DocumentTemplateResolver;
 import com.ruoyi.common.exception.ServiceException;
 import com.ruoyi.common.utils.file.FileUtils;
 import com.ruoyi.common.utils.StringUtils;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.io.InputStream;
 import javax.servlet.http.HttpServletResponse;
 import com.ruoyi.system.mapper.SysTagMapper;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -54,6 +59,9 @@ public class SysDocumentController extends BaseController
     @Autowired
     private DocumentTemplateResolver documentTemplateResolver;
 
+    @Autowired
+    private DocumentMineruImageService documentMineruImageService;
+
     @PreAuthorize("@ss.hasPermi('system:document:extract:query')")
     @GetMapping("/{documentId}/preview/template")
     public void previewTemplate(@PathVariable Long documentId,
@@ -91,6 +99,46 @@ public class SysDocumentController extends BaseController
         SysDocument document = previewDocument(documentId);
         response.setContentType("image/png");
         documentPreviewService.writeUploadPage(document, page, response.getOutputStream());
+    }
+
+    /** 当前上传文件由 MinerU 解析后保存至 MinIO 的图片列表。 */
+    @PreAuthorize("@ss.hasPermi('system:document:extract:query')")
+    @GetMapping("/{documentId}/mineru-images")
+    public AjaxResult mineruImages(@PathVariable Long documentId)
+    {
+        SysDocument document = previewDocument(documentId);
+        List<Map<String, Object>> result = new ArrayList<Map<String, Object>>();
+        for (DocumentMineruImage image : documentMineruImageService.listImages(document))
+        {
+            Map<String, Object> item = new HashMap<String, Object>();
+            item.put("imageId", image.getImageId());
+            item.put("name", image.getName());
+            item.put("contentType", image.getContentType());
+            item.put("size", image.getSize());
+            result.add(item);
+        }
+        return success(result);
+    }
+
+    /** 代理读取当前上传文件的一张 MinerU 图片，浏览器无需直接访问 MinIO。 */
+    @PreAuthorize("@ss.hasPermi('system:document:extract:query')")
+    @GetMapping("/{documentId}/mineru-images/{imageId}/content")
+    public void mineruImageContent(@PathVariable Long documentId, @PathVariable String imageId,
+                                   HttpServletResponse response) throws Exception
+    {
+        SysDocument document = previewDocument(documentId);
+        DocumentMineruImage image = documentMineruImageService.getImage(document, imageId);
+        response.setContentType(StringUtils.defaultString(image.getContentType()));
+        response.setHeader("Content-Disposition", "inline; filename=\"" + image.getName() + "\"");
+        try (InputStream input = documentMineruImageService.openImage(document, imageId))
+        {
+            byte[] buffer = new byte[8192];
+            int length;
+            while ((length = input.read(buffer)) != -1)
+            {
+                response.getOutputStream().write(buffer, 0, length);
+            }
+        }
     }
 
     private SysDocument previewDocument(Long documentId)

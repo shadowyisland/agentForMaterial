@@ -31,6 +31,7 @@ import com.ruoyi.system.mapper.SysDocumentRecordMapper;
 import com.ruoyi.system.mapper.SysTagMapper;
 import com.ruoyi.system.service.ISysDocumentService;
 import com.ruoyi.system.service.DocumentExtractService;
+import com.ruoyi.system.service.DocumentMineruImageService;
 import com.ruoyi.system.domain.SysDocumentExtract;
 
 /**
@@ -58,6 +59,9 @@ public class SysDocumentServiceImpl implements ISysDocumentService {
 
     @Autowired
     private DocumentExtractService documentExtractService;
+
+    @Autowired
+    private DocumentMineruImageService documentMineruImageService;
 
     @Override
     public SysDocument selectDocumentById(Long documentId) {
@@ -279,6 +283,9 @@ public class SysDocumentServiceImpl implements ISysDocumentService {
         }
         sysTagMapper.deleteDocTagByDocIds(documentIds);
         documentExtractService.deleteByDocumentIds(documentIds);
+        for (SysDocument document : documents) {
+            documentMineruImageService.deleteImages(document);
+        }
         int rows = documentMapper.deleteDocumentByIds(documentIds);
         deleteLocalFiles(documents);
         return rows;
@@ -321,10 +328,11 @@ public class SysDocumentServiceImpl implements ISysDocumentService {
         }
 
         try {
-            String resultContent = minerUParseService.parseToMarkdown(localPath, doc.getFileOriginName());
-            // 3. 更新数据库
+            MinerUParseResult result = minerUParseService.parse(localPath, doc.getFileOriginName());
+            documentMineruImageService.replaceImages(doc, result.getImages());
+            // Markdown 与当前上传文档解析出的图片一起完成保存。
             doc.setIsRecognized(1);
-            doc.setOcrContent(resultContent);
+            doc.setOcrContent(result.getMarkdownContent());
             doc.setOcrTime(DateUtils.getNowDate());
             doc.setOcrError("");
 

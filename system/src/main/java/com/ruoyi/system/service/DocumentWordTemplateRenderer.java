@@ -191,9 +191,11 @@ public class DocumentWordTemplateRenderer
         Matcher matcher = TOKEN.matcher(text);
         List<int[]> ranges = new ArrayList<int[]>();
         List<String> replacements = new ArrayList<String>();
+        boolean containsComponentValue = false;
         while (matcher.find())
         {
             String key = matcher.group(1);
+            containsComponentValue = containsComponentValue || isComponentValue(key);
             ranges.add(new int[] { matcher.start(), matcher.end() });
             replacements.add(key.startsWith("#") ? "" : key.startsWith("+") && line != null ? line
                     : display(resolve(root, item, key, index)));
@@ -225,8 +227,97 @@ public class DocumentWordTemplateRenderer
             for (Element element : texts)
             {
                 setText(element, element.getTextContent());
+                applySymbolColor(element);
+                if (containsComponentValue)
+                {
+                    removeBoldFromCell(element);
+                }
             }
         }
+    }
+
+    private boolean isComponentValue(String key)
+    {
+        return ".组分".equals(key) || ".成分名称".equals(key);
+    }
+
+    /** 组分名称及其同一单元格内的 CAS、EC 等值使用正文常规字重。 */
+    private void removeBoldFromCell(Element text)
+    {
+        Node cell = text;
+        while (cell != null && !is(cell, "tc"))
+        {
+            cell = cell.getParentNode();
+        }
+        if (cell == null)
+        {
+            return;
+        }
+        setBoldOff(cell);
+    }
+
+    private void setBoldOff(Node parent)
+    {
+        for (Node child : children(parent))
+        {
+            if (is(child, "b"))
+            {
+                parent.removeChild(child);
+                continue;
+            }
+            setBoldOff(child);
+        }
+    }
+
+    /**
+     * 法规清单中的勾叉由填写值决定，不能沿用模板示例单元格的字体颜色。
+     */
+    private void applySymbolColor(Element text)
+    {
+        String value = text.getTextContent().trim();
+        String color = null;
+        if ("√".equals(value) || "✓".equals(value))
+        {
+            color = "00B050";
+        }
+        else if ("×".equals(value) || "✕".equals(value) || "✖".equals(value))
+        {
+            color = "FF0000";
+        }
+        if (color == null || !is(text.getParentNode(), "r"))
+        {
+            return;
+        }
+        Element run = (Element) text.getParentNode();
+        Element properties = null;
+        for (Node child : children(run))
+        {
+            if (is(child, "rPr"))
+            {
+                properties = (Element) child;
+                break;
+            }
+        }
+        if (properties == null)
+        {
+            properties = text.getOwnerDocument().createElementNS(W, "w:rPr");
+            run.insertBefore(properties, run.getFirstChild());
+        }
+        Element colorElement = null;
+        for (Node child : children(properties))
+        {
+            if (is(child, "color"))
+            {
+                colorElement = (Element) child;
+                break;
+            }
+        }
+        if (colorElement == null)
+        {
+            colorElement = text.getOwnerDocument().createElementNS(W, "w:color");
+            properties.appendChild(colorElement);
+        }
+        colorElement.setAttributeNS(W, "w:val", color);
     }
 
     private void setText(Element text, String value)
