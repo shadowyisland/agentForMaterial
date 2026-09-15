@@ -1312,13 +1312,6 @@ export default {
             ),
             source
           );
-          if (
-            this.extractDocumentInfo.materialCategory === "EPOXY" &&
-            this.extractDocumentInfo.documentKind === "TDS" &&
-            Array.isArray(source.图片)
-          ) {
-            this.$set(form, "图片", source.图片);
-          }
           this.extractForm = form;
         })
         .catch(() => {

@@ -37,6 +37,7 @@ public class DocumentWordTemplateRenderer
     private static final Pattern TOKEN = Pattern.compile("\\{\\{([^{}]+)}}");
     private static final Pattern ROW = Pattern.compile("\\{\\{#([^{}]+)}}");
     private static final Pattern PARAGRAPH = Pattern.compile("\\{\\{\\+([^{}]+)}}");
+    static final String KEEP_EMPTY_VALUE_ROWS = "__保留空值行";
 
     public void render(InputStream template, Map<String, Object> values, OutputStream output) throws Exception
     {
@@ -372,6 +373,19 @@ public class DocumentWordTemplateRenderer
                 primaryPaths.add(path);
             }
         }
+        if (Boolean.TRUE.equals(root.get(KEEP_EMPTY_VALUE_ROWS)))
+        {
+            // TDS 的参数行需要保留“字段存在但内容为空”的情况；只有用户在网页中主动删除字段，
+            // 该字段路径才不再存在，此时才移除整行。
+            for (String path : paths)
+            {
+                if (hasPath(root, item, path))
+                {
+                    return false;
+                }
+            }
+            return !paths.isEmpty();
+        }
         // 含“数值/含量”等核心字段的规格行，只由核心字段决定是否显示；
         // 单位、测试方法和类别等模板默认值不能单独让空行出现在导出文件中。
         List<String> candidates = primaryPaths.isEmpty() ? paths : primaryPaths;
@@ -388,6 +402,39 @@ public class DocumentWordTemplateRenderer
     private boolean hasValue(Map<String, Object> root, Object item, String path, int index)
     {
         return isMeaningful(resolve(root, item, path, index));
+    }
+
+    private boolean hasPath(Map<String, Object> root, Object item, String path)
+    {
+        if (".".equals(path))
+        {
+            return item != null;
+        }
+        return path.startsWith(".") ? hasPath(item, path.substring(1)) : hasPath(root, path);
+    }
+
+    private boolean hasPath(Object value, String path)
+    {
+        if (!(value instanceof Map))
+        {
+            return false;
+        }
+        Map<?, ?> object = (Map<?, ?>) value;
+        // 与 pathValue 保持一致，支持 CAS No. 等字段名本身包含句点。
+        if (object.containsKey(path))
+        {
+            return true;
+        }
+        String prefix = null;
+        for (Object key : object.keySet())
+        {
+            String name = String.valueOf(key);
+            if (path.startsWith(name + ".") && (prefix == null || name.length() > prefix.length()))
+            {
+                prefix = name;
+            }
+        }
+        return prefix != null && hasPath(object.get(prefix), path.substring(prefix.length() + 1));
     }
 
     private boolean isPrimaryDataPath(String path)

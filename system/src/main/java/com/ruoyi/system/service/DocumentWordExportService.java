@@ -34,8 +34,11 @@ public class DocumentWordExportService
     private static final String PICTOGRAM_IMAGE = "{{@象形图}}";
     private static final String PERSONAL_PROTECTION_IMAGE = "{{@个人防护装备总要求}}";
     private static final String TRANSPORT_LABEL_IMAGE = "{{@运输标签}}";
-    /** 2.05cm，图片宽度根据原始纵横比自动计算。 */
+    /** 普通图片高度固定 2.05cm，宽度根据原始纵横比自动计算。 */
     private static final double IMAGE_FIXED_HEIGHT_POINTS = 72.0 * 2.05 / 2.54;
+    /** 分子结构图片按模板版式固定为宽 8.33cm、高 1.77cm。 */
+    private static final double STRUCTURE_IMAGE_WIDTH_POINTS = 72.0 * 8.33 / 2.54;
+    private static final double STRUCTURE_IMAGE_HEIGHT_POINTS = 72.0 * 1.77 / 2.54;
 
     @Autowired
     private DocumentTemplateResolver documentTemplateResolver;
@@ -53,6 +56,7 @@ public class DocumentWordExportService
         root.put("内部编号", StringUtils.defaultString(document.getInternalCode()));
         normalizeMsds(document, root);
         normalizeFillerSolventRows(document, root);
+        enableTdsEmptyValueRows(document, root);
         try (InputStream input = template.getInputStream())
         {
             DocumentWordTemplateRenderer renderer = new DocumentWordTemplateRenderer();
@@ -86,6 +90,21 @@ public class DocumentWordExportService
     public void validateTemplate(SysDocument document)
     {
         documentTemplateResolver.resolve(document.getMaterialCategory(), document.getDocumentKind());
+    }
+
+    /** 六类材料 TDS 的模板参数即使未填写，也需保留表格行并输出为空白。 */
+    private void enableTdsEmptyValueRows(SysDocument document, JSONObject root)
+    {
+        if (!"TDS".equals(document.getDocumentKind()))
+        {
+            return;
+        }
+        String category = document.getMaterialCategory();
+        if ("ACRYLIC".equals(category) || "EPOXY".equals(category) || "OTHER_RESIN".equals(category)
+                || "FILLER".equals(category) || "SILICONE".equals(category) || "ADDITIVE".equals(category))
+        {
+            root.put(DocumentWordTemplateRenderer.KEEP_EMPTY_VALUE_ROWS, true);
+        }
     }
 
     private void normalizeFillerSolventRows(SysDocument document, JSONObject root)
@@ -262,11 +281,16 @@ public class DocumentWordExportService
     private String imageMarker(JSONObject image)
     {
         String type = image.getString("类型");
-        if ("分子结构".equals(type) || "分子结构后".equals(image.getString("位置"))) return STRUCTURE_IMAGE;
+        if (isStructureImage(image)) return STRUCTURE_IMAGE;
         if ("象形图".equals(type)) return PICTOGRAM_IMAGE;
         if ("个人防护装备总要求".equals(type)) return PERSONAL_PROTECTION_IMAGE;
         if ("运输标签".equals(type)) return TRANSPORT_LABEL_IMAGE;
         return null;
+    }
+
+    private boolean isStructureImage(JSONObject image)
+    {
+        return "分子结构".equals(image.getString("类型")) || "分子结构后".equals(image.getString("位置"));
     }
 
     private java.util.List<XWPFParagraph> allParagraphs(XWPFDocument word)
@@ -300,10 +324,19 @@ public class DocumentWordExportService
                 throw new ServiceException("图片格式不正确: " + pictureName);
             }
             // 图片可能来自 MinIO 或本地上传，但最终都必须按组件尺寸插入。
-            // 与 Word 的“锁定纵横比”一致：单张图片高度固定 2.05cm，宽度随原图比例变化。
-            double scale = IMAGE_FIXED_HEIGHT_POINTS / image.getHeight();
-            double width = image.getWidth() * scale;
-            double height = IMAGE_FIXED_HEIGHT_POINTS;
+            double width;
+            double height;
+            if (isStructureImage(imageItem))
+            {
+                width = STRUCTURE_IMAGE_WIDTH_POINTS;
+                height = STRUCTURE_IMAGE_HEIGHT_POINTS;
+            }
+            else
+            {
+                double scale = IMAGE_FIXED_HEIGHT_POINTS / image.getHeight();
+                width = image.getWidth() * scale;
+                height = IMAGE_FIXED_HEIGHT_POINTS;
+            }
             XWPFRun run = paragraph.createRun();
             String name = StringUtils.isEmpty(pictureName) ? "image.png" : pictureName;
             run.addPicture(inputStream, getPictureType(name), name,

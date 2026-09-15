@@ -467,11 +467,24 @@ export default {
             String(this.value[key] || "").length > 80,
         }));
       const result = [];
+      const imageFields = this.isMsds ? [] : this.imageFields;
       sections.forEach((section) => {
+        const beforeFields = imageFields.filter((field) => field.before === section.key);
+        if (beforeFields.length) {
+          result.push({ key: section.key + "-前图片", type: "image", fields: beforeFields });
+        }
         result.push(section);
-        const fields = this.isMsds ? [] : this.imageFields.filter((field) => field.after === section.key);
-        if (fields.length) result.push({ key: section.key + '-图片', type: 'image', fields });
+        const fields = imageFields.filter((field) => field.after === section.key);
+        if (fields.length) {
+          result.push({ key: section.key + "-图片", type: "image", fields });
+        }
       });
+      const unmatchedBeforeFields = imageFields.filter(
+        (field) => field.before && !sections.some((section) => section.key === field.before)
+      );
+      if (unmatchedBeforeFields.length) {
+        result.unshift({ key: "顶部图片", type: "image", fields: unmatchedBeforeFields });
+      }
       return result;
     },
     images() {
@@ -482,7 +495,7 @@ export default {
     },
     isMsds() { return this.documentKind === "MSDS"; },
     imageFields() {
-      if (this.isEpoxyTds) return [{ type: "分子结构", title: "分子结构", position: "分子结构后", after: "组分及结构式" }];
+      if (this.isEpoxyTds) return [{ type: "分子结构", title: "分子结构", position: "分子结构后", before: "主要特性" }];
       if (!this.isMsds) return [];
       return [
         { type: "象形图", title: "象形图", position: "第2部分标签要素", path: "第2部分 危险标识.标签要素.象形图" },
@@ -992,6 +1005,9 @@ export default {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
   min-height: 180px;
+  max-height: 60vh;
+  padding-right: 8px;
+  overflow-y: auto;
 }
 .mineru-image-card {
   position: relative;
