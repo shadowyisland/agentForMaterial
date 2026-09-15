@@ -120,7 +120,7 @@ export function ocrDocument(documentId) {
   return request({
     url: '/system/document/ocr/' + documentId,
     method: 'post',
-    timeout: 100000,
+    timeout: 300000,
   })
 }
 

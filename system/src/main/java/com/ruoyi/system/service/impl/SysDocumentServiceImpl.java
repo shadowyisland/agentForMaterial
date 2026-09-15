@@ -189,7 +189,7 @@ public class SysDocumentServiceImpl implements ISysDocumentService {
             insertTags(document.getTags(), document, document.getCreateBy());
         }
 
-        // 文档和标签先落库。内部文档执行 OCR + AI，外部文档只执行 OCR。
+        // 只有选择了 TDS 或 MSDS 的内部文档才会继续 AI 抽取；未选择资料类型时只执行 OCR。
         autoParse(document);
         return rows;
     }
@@ -208,7 +208,8 @@ public class SysDocumentServiceImpl implements ISysDocumentService {
         document.setDocumentType(current.getDocumentType());
         document.setMaterialCategory(current.getMaterialCategory());
         if (DocumentConstants.TYPE_INTERNAL.equals(current.getDocumentType())) {
-            normalizeDocumentKind(document);
+            // 资料类型由上传时确定，详情编辑不得改变后续解析和 Word 模板。
+            document.setDocumentKind(current.getDocumentKind());
             document.setSourceName("");
             document.setSourceUrl("");
             document.setPublishDate(null);
@@ -405,7 +406,8 @@ public class SysDocumentServiceImpl implements ISysDocumentService {
     private void autoParse(SysDocument document) {
         try {
             ocrDocument(document.getDocumentId());
-            if (DocumentConstants.TYPE_INTERNAL.equals(document.getDocumentType())) {
+            if (DocumentConstants.TYPE_INTERNAL.equals(document.getDocumentType())
+                    && StringUtils.isNotEmpty(document.getDocumentKind())) {
                 documentExtractService.extractDocument(document.getDocumentId());
             }
         } catch (Exception e) {

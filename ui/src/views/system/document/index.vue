@@ -232,7 +232,11 @@
                 @click="handleDetail(scope.row)"
               />
             </el-tooltip>
-            <el-tooltip v-if="canViewExtract" content="解析结果" placement="top">
+            <el-tooltip
+              v-if="canViewExtract && scope.row.documentKind"
+              content="解析结果"
+              placement="top"
+            >
               <el-button
                 type="text"
                 icon="el-icon-document-checked"
@@ -309,11 +313,14 @@
               <el-input v-model="form.internalCode" /> </el-form-item
           ></el-col>
         </el-row>
-        <el-form-item v-if="!isExternal" label="文档类型" prop="documentKind">
+        <el-form-item v-if="!isExternal" label="文档类型">
           <el-radio-group v-model="form.documentKind">
             <el-radio label="TDS"> TDS </el-radio>
             <el-radio label="MSDS"> MSDS </el-radio>
           </el-radio-group>
+          <div class="document-kind-tip">
+            可选；不选择时仅进行 MinerU OCR，不进行 AI 解析。
+          </div>
         </el-form-item>
         <template v-if="isExternal">
           <el-form-item label="来源单位/网站">
@@ -385,10 +392,11 @@
       </div>
     </el-dialog>
 
-    <el-drawer
+    <el-dialog
       :visible.sync="detailOpen"
-      :size="drawerSize"
-      custom-class="document-detail-drawer"
+      :width="detailDialogWidth"
+      top="5vh"
+      custom-class="document-detail-dialog"
       append-to-body
       @closed="resetDetail"
     >
@@ -433,13 +441,10 @@
                 ></el-col>
               </el-row>
               <el-form-item v-if="detailForm.documentType !== 'EXTERNAL'" label="文档类型">
-                <el-radio-group
-                  v-model="detailForm.documentKind"
-                  :disabled="!canEditDocument"
-                >
-                  <el-radio label="TDS"> TDS </el-radio>
-                  <el-radio label="MSDS"> MSDS </el-radio>
-                </el-radio-group>
+                <el-input
+                  :value="detailForm.documentKind || '未选择（仅 OCR）'"
+                  disabled
+                />
               </el-form-item>
               <template v-if="detailForm.documentType === 'EXTERNAL'">
                 <el-form-item label="来源单位/网站">
@@ -664,7 +669,7 @@
           </el-tab-pane>
         </el-tabs>
       </div>
-    </el-drawer>
+    </el-dialog>
 
     <el-dialog
       :visible.sync="extractOpen"
@@ -918,13 +923,6 @@ export default {
             trigger: "change",
           },
         ],
-        documentKind: [
-          {
-            required: true,
-            message: "请选择 TDS 或 MSDS",
-            trigger: "change",
-          },
-        ],
         sourceUrl: [
           {
             type: "url",
@@ -981,15 +979,18 @@ export default {
     uploadProcessTip() {
       return this.isExternal
         ? "确认上传后自动进行 OCR，不进行 AI 解析。"
-        : "确认上传后自动进行 OCR 和 AI 解析。";
+        : "可选择 TDS 或 MSDS 进入 AI 解析；不选择时仅进行 MinerU OCR。";
+    },
+    isOcrOnlyUpload() {
+      return this.isExternal || !this.form.documentKind;
     },
     processingDescription() {
-      return this.isExternal
+      return this.isOcrOnlyUpload
         ? "正在调用 MinerU 进行 OCR"
         : "正在调用 MinerU 和 AI 处理文件";
     },
     processingProgress() {
-      return Math.min(95, 8 + Math.floor((this.processingElapsed / 120) * 70));
+      return Math.min(95, 6 + Math.floor((this.processingElapsed / 300) * 89));
     },
     processingElapsedText() {
       const minutes = Math.floor(this.processingElapsed / 60);
@@ -1001,6 +1002,9 @@ export default {
     },
     drawerSize() {
       return this.windowWidth < 768 ? "100%" : "720px";
+    },
+    detailDialogWidth() {
+      return this.windowWidth < 768 ? "96%" : "88%";
     },
     isAdmin() {
       return (this.$store.getters.roles || []).includes("admin");
@@ -1169,13 +1173,14 @@ export default {
     submitForm() {
       this.$refs.form.validate((valid) => {
         if (!valid) return;
+        const ocrOnly = this.isOcrOnlyUpload;
         this.submitting = true;
         this.startDocumentProcessing();
         addDocument(Object.assign({}, this.form, this.scopeParams()))
           .then((res) => {
             const documentId = res.data;
             this.$modal.msgSuccess(
-              this.isExternal
+              ocrOnly
                 ? "文档上传成功，OCR 已处理"
                 : "文档上传成功，已进入解析结果"
             );
@@ -1183,8 +1188,9 @@ export default {
             this.getList();
             this.getTagsList();
             this.getStats();
-            if (this.isExternal) {
-              this.handleDetail({ documentId });
+            if (ocrOnly) {
+              this.stopDocumentProcessing();
+              this.handleDetail({ documentId }, "ocr");
             } else {
               this.handleExtract({ documentId });
             }
@@ -1207,10 +1213,10 @@ export default {
       this.processingTimer = null;
       this.processingUpload = false;
     },
-    handleDetail(row) {
+    handleDetail(row, activeTab = "basic") {
       this.detailOpen = true;
       this.detailLoading = true;
-      this.detailTab = "basic";
+      this.detailTab = activeTab;
       this.records = [];
       this.recordsLoaded = false;
       this.cancelRecordEdit();
@@ -1793,6 +1799,12 @@ export default {
 .table-tag {
   margin: 2px 5px 2px 0;
 }
+.document-kind-tip {
+  margin-top: 7px;
+  color: #8a98a7;
+  font-size: 12px;
+  line-height: 1.5;
+}
 .more-button {
   margin-left: 9px;
 }
@@ -1810,11 +1822,33 @@ export default {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.drawer-body,
+.drawer-body {
+  flex: 1;
+  min-height: 0;
+  height: auto;
+  padding: 0 24px 28px;
+  overflow: auto;
+}
 .tag-manager-body {
   height: calc(100vh - 78px);
   padding: 0 24px 28px;
   overflow: auto;
+}
+::v-deep .document-detail-dialog {
+  display: flex;
+  flex-direction: column;
+  height: 90vh;
+  margin: 5vh auto !important;
+}
+::v-deep .document-detail-dialog .el-dialog__header {
+  flex: 0 0 auto;
+}
+::v-deep .document-detail-dialog .el-dialog__body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  padding: 0;
+  overflow: hidden;
 }
 .detail-form {
   padding-top: 8px;
